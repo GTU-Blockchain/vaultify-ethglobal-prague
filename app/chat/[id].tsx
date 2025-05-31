@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { Colors } from '../constants/Colors';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+
 
 interface Vault {
   id: string;
@@ -15,8 +17,9 @@ interface Vault {
 
 export default function VaultListScreen() {
   const { id, name } = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
 
   // Bu kısım blockchain'den gelecek
   const vaults: Vault[] = [
@@ -47,13 +50,19 @@ export default function VaultListScreen() {
   ];
 
   const handleCreateVault = () => {
-    // Yeni vault oluşturma işlemi burada yapılacak
-    console.log('Creating new vault for:', name);
+    // Kameraya yönlendir, kullanıcı bilgilerini gönder
+    router.push({
+      pathname: '/(tabs)/camera',
+      params: { username: name, userId: id }
+    });
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+<View style={[styles.container, { backgroundColor: colors.background }]}>
+  <View style={[
+    styles.header,
+    { borderBottomColor: colors.icon + '20', paddingTop: insets.top }
+  ]}>
         <TouchableOpacity 
           onPress={() => router.back()}
           style={styles.backButton}
@@ -77,12 +86,12 @@ export default function VaultListScreen() {
             <View style={styles.vaultContent}>
               <Text style={[styles.vaultName, { color: colors.text }]}>{vault.name}</Text>
               <View style={styles.vaultInfo}>
-                <Text style={[styles.vaultDate, { color: colors.tabIconDefault }]}>{vault.date}</Text>
+                <Text style={[styles.vaultDate, { color: colors.icon }]}>{vault.date}</Text>
                 {vault.status === 'pending' && (
-                  <Ionicons name="time" size={16} color={colors.tabIconDefault} style={styles.statusIcon} />
+                  <Ionicons name="time" size={16} color={colors.icon} style={styles.statusIcon} />
                 )}
                 {vault.status === 'completed' && (
-                  <Ionicons name="checkmark-done" size={16} color={colors.tabIconDefault} style={styles.statusIcon} />
+                  <Ionicons name="checkmark-done" size={16} color={colors.icon} style={styles.statusIcon} />
                 )}
               </View>
             </View>
@@ -92,7 +101,7 @@ export default function VaultListScreen() {
       </ScrollView>
 
       <TouchableOpacity 
-        style={[styles.fab, { backgroundColor: colors.tint }]}
+        style={[styles.fab, { backgroundColor: colors.tint, bottom: insets.bottom + 20 }]}
         onPress={handleCreateVault}
       >
         <Ionicons name="add" size={24} color="white" />
@@ -113,7 +122,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   backButton: {
     marginRight: 16,

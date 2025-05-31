@@ -2,14 +2,13 @@
 import 'react-native-get-random-values';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { StyleSheet, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { NavigationHeader } from '../components/NavigationHeader';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -18,12 +17,17 @@ export default function TabLayout() {
         <Tabs
           screenOptions={{
             headerShown: false,
-            tabBarStyle: { display: 'none' },
+            tabBarStyle: { 
+              display: 'none',
+              backgroundColor: colors.background,
+              borderTopColor: colors.icon,
+            },
           }}
         >
           <Tabs.Screen name="chat" />
           <Tabs.Screen name="camera" />
           <Tabs.Screen name="location" />
+          <Tabs.Screen name="dashboard" />
         </Tabs>
       </View>
       <BottomNavBar />

@@ -1,21 +1,6 @@
-
-import { getRandomValues } from 'expo-crypto';
-import * as Linking from 'expo-linking';
-import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { walletConnectService } from './services/WalletConnectService';
-
-// Polyfill crypto.getRandomValues
-if (typeof global.crypto === 'undefined') {
-  (global as any).crypto = {
-    getRandomValues: getRandomValues,
-    subtle: undefined,
-    randomUUID: undefined
-  };
-}
-
-
+import { Slot } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ThemeProvider } from './context/ThemeContext';
 
 export default function RootLayout() {
   const [walletConnectInitialized, setWalletConnectInitialized] = useState(false);
@@ -60,8 +45,10 @@ export default function RootLayout() {
   };
 
   return (
-    <SafeAreaProvider>
-      <Slot />
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <Slot />
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }

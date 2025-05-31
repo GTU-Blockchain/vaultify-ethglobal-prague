@@ -2,22 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import {
-  Alert,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View
-} from 'react-native';
+import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { useWalletConnect } from '../../hooks/useWalletConnect';
+import { BottomNavBar } from '../components/BottomNavBar';
 import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 interface MediaState {
   uri: string;
@@ -25,31 +17,35 @@ interface MediaState {
 }
 
 export default function CameraScreen() {
+  const { username: routeUsername } = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  
-  // Wallet hook
-  const { 
-    isConnected, 
-    address, 
-    balance, 
-    isLoading: isWalletLoading,
-    error: walletError,
-    connect,
-    disconnect
-  } = useWalletConnect();
-  
-  // UI states
-  const [media, setMedia] = useState<MediaState | null>(null);
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [cameraType, setCameraType] = useState<CameraType>('back');
+  const [media, setMedia] = useState<{ uri: string; type: 'photo' | 'video' } | null>(null);
+  const [showVaultModal, setShowVaultModal] = useState(false);
+  const [username, setUsername] = useState(routeUsername ? String(routeUsername) : '');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [cameraType, setCameraType] = useState<'front' | 'back'>('back');
   const [isRecording, setIsRecording] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [hasStartedRecording, setHasStartedRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
+  const cameraRef = useRef<any>(null);
+  const videoRef = useRef<any>(null);
+
+  const longPressTimer = useRef<number | null>(null);
+
+  const { theme } = useTheme();
+
+  React.useEffect(() => {
+    requestPermission();
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
   
   // Form states
   const [usernameInput, setUsernameInput] = useState('');
@@ -175,19 +171,38 @@ export default function CameraScreen() {
     setIsLongPressing(false);
   };
 
-  if (!permission?.granted) {
+  const handleSend = () => {
+    setShowVaultModal(true);
+  };
+
+  const handleCancel = () => {
+    setMedia(null);
+  };
+
+  const handleCreateVault = () => {
+    // TODO: Implement vault creation logic
+    setShowVaultModal(false);
+    router.push('/chat/1');
+  };
+
+  const toggleCameraType = () => {
+    setCameraType(current => current === 'back' ? 'front' : 'back');
+  };
+
+  if (!permission) {
+    return <View style={styles.container} />;
+  }
+  if (!permission.granted) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text style={[styles.text, { color: colors.text }]}>Camera permission required</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <Text style={[styles.errorText, { color: colors.text }]}>No access to camera</Text>
       </View>
     );
   }
 
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {!media ? (
         <View style={styles.container}>
           <CameraView ref={cameraRef} style={styles.camera} facing={cameraType} />
@@ -235,37 +250,101 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {/* Username Registration Modal */}
-      <Modal visible={showUsernameModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modal, { backgroundColor: colors.background }]}>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showVaultModal}
+        onRequestClose={() => setShowVaultModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { 
+            backgroundColor: theme === 'dark' ? colors.background : '#F0FFF0',
+            borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20',
+            shadowColor: theme === 'dark' ? 'transparent' : '#1B3B4B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 5
+          }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Register Username</Text>
-              <TouchableOpacity onPress={() => setShowUsernameModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
+              <Text style={[styles.modalTitle, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Create New Vault</Text>
+              <TouchableOpacity onPress={() => setShowVaultModal(false)}>
+                <Ionicons name="close" size={24} color={theme === 'dark' ? colors.text : '#1B3B4B'} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalContent}>
-              <Text style={[styles.description, { color: colors.text }]}>
-                Choose a unique username for your account
-              </Text>
-              
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Vault Name</Text>
               <TextInput
-                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.text, color: colors.text }]}
-                placeholder="Enter username (3-20 characters)"
-                placeholderTextColor={colors.icon}
-                value={usernameInput}
-                onChangeText={setUsernameInput}
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter vault name"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
               />
-
-              <TouchableOpacity style={styles.primaryButton} onPress={handleRegisterUsername}>
-                <Text style={styles.buttonText}>Register Username</Text>
-              </TouchableOpacity>
             </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Unlock Date</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={amount}
+                onChangeText={(text) => {
+                  const regex = /^\d*\.?\d*$/;
+                  if (regex.test(text)) {
+                    setAmount(text);
+                  }
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Content</Text>
+              <TextInput
+                style={[styles.input, styles.textArea, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Enter your message"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createButton, { 
+                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
+                marginTop: 16,
+                shadowColor: theme === 'dark' ? 'transparent' : '#2E8B57',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 3
+              }]}
+              onPress={handleCreateVault}
+            >
+              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Create Vault</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      <BottomNavBar />
     </View>
   );
 }
@@ -314,24 +393,74 @@ const styles = StyleSheet.create({
   },
   recordingIndicator: {
     position: 'absolute',
-    top: -40,
-    flexDirection: 'row',
+    left: 20,
+    padding: 10,
+  },
+  sendButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 25,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    padding: 20,
   },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'red',
-    marginRight: 8,
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
   },
-  recordingTime: {
-    color: 'white',
-    fontSize: 14,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
   },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  createButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+  },
 });
+

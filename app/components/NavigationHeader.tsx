@@ -1,50 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useUsername } from '../../hooks/useUsername';
-import { useWalletConnect } from '../../hooks/useWalletConnect';
-import { Colors } from '../constants/Colors';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { useColorScheme } from 'react-native';
+import { Header } from './Header';
 
 export const NavigationHeader = () => {
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
-  
-  // Wallet and username hooks
-  const {
-    isConnected,
-    address,
-    balance,
-    isLoading,
-    error,
-    connect,
-    disconnect
-  } = useWalletConnect();
-  const username = useUsername(isConnected ? address : null);
-  
-  // UI states
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [usernameInput, setUsernameInput] = useState('');
-  const [showPrivateKeyInput, setShowPrivateKeyInput] = useState(false);
-  const [privateKeyInput, setPrivateKeyInput] = useState('');
+  const router = useRouter();
 
-  // Load username when wallet connects
-  React.useEffect(() => {
-    if (isConnected && address) {
-      username.loadUsername(address);
-    }
-  }, [isConnected, address]);
-
-  const handleWalletPress = () => {
-    if (!isConnected) {
-      handleConnect();
-    } else if (!username.username) {
-      setShowUsernameModal(true);
-    } else {
-      setShowWalletModal(true);
-    }
+  const handleConnectWallet = () => {
+    // Dashboard'a yönlendir
+    router.push('/dashboard');
   };
 
   const handleConnect = async () => {
@@ -240,115 +205,3 @@ export const NavigationHeader = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-  },
-  leftButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  walletButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 6,
-  },
-  walletText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modal: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  walletInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  label: {
-    fontWeight: 'bold',
-    marginTop: 5,
-  },
-  value: {
-    fontFamily: 'monospace',
-    marginBottom: 10,
-  },
-  actionButton: {
-    backgroundColor: '#6c757d',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  disconnectButton: {
-    backgroundColor: '#dc3545',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  disconnectButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  description: {
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 15,
-  },
-  registerButton: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  registerButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-}); 

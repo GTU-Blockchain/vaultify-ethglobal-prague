@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, useColorScheme } from 'react-native';
-import { Colors } from '../constants/Colors';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface PersonProps {
   name: string;
@@ -9,12 +9,11 @@ interface PersonProps {
 }
 
 export default function Person({ name, imageUrl, onPress }: PersonProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useTheme();
 
   return (
     <TouchableOpacity 
-      style={styles.container} 
+      style={[styles.container, { backgroundColor: colors.background }]} 
       onPress={onPress}
     >
       <View style={styles.personRow}>
@@ -24,7 +23,7 @@ export default function Person({ name, imageUrl, onPress }: PersonProps) {
             style={styles.avatar}
           />
         ) : (
-          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.tabIconDefault }]}>
+          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.tint }]}>
             <Text style={[styles.avatarText, { color: colors.background }]}>
               {name.charAt(0)}
             </Text>
@@ -32,7 +31,7 @@ export default function Person({ name, imageUrl, onPress }: PersonProps) {
         )}
         <View style={styles.textContainer}>
           <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
-          <Text style={[styles.tapText, { color: colors.tabIconDefault }]}>Tap to view</Text>
+          <Text style={[styles.tapText, { color: colors.icon }]}>Tap to view</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -42,7 +41,9 @@ export default function Person({ name, imageUrl, onPress }: PersonProps) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   personRow: {
     flexDirection: 'row',
@@ -69,7 +70,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   tapText: {
     fontSize: 14,
