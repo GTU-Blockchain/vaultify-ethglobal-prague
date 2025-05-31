@@ -1,27 +1,31 @@
 {
   "expo": {
-    "name": "vaultify-ethglobal-prague",
-    "slug": "vaultify-ethglobal-prague",
+    "name": "SnapVault",
+    "slug": "snapvault",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "vaultifyethglobalprague",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vaultify.ethglobalprague",
+      "bundleIdentifier": "com.vaultify.app",
+   
       "config": {
         "googleMapsApiKey": "YOUR_IOS_API_KEY"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.vaultify.ethglobalprague",
+      "package": "com.vaultify.app",
+  
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_ANDROID_API_KEY"
@@ -29,22 +33,17 @@
       }
     },
     "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
+        "expo-camera",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "cameraPermission": "Allow SnapVault to access your camera to take photos and record videos for snaps."
         }
       ],
-      "expo-video",
       [
         "expo-location",
         {

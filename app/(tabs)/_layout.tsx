@@ -1,3 +1,6 @@
+
+import 'react-native-get-random-values';
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { BottomNavBar } from '../components/BottomNavBar';
