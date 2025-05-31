@@ -23,7 +23,7 @@ export default function CameraScreen() {
   const [hasStartedRecording, setHasStartedRecording] = useState(false);
   const cameraRef = useRef<any>(null);
   const videoRef = useRef<any>(null);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimer = useRef<number | null>(null);
 
   React.useEffect(() => {
     requestPermission();

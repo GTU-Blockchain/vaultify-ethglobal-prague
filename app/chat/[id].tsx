@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { Colors } from '../constants/Colors';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface Vault {
   id: string;
@@ -15,8 +15,7 @@ interface Vault {
 
 export default function VaultListScreen() {
   const { id, name } = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useTheme();
 
   // Bu kısım blockchain'den gelecek
   const vaults: Vault[] = [
@@ -53,7 +52,7 @@ export default function VaultListScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.icon + '20' }]}>
         <TouchableOpacity 
           onPress={() => router.back()}
           style={styles.backButton}
@@ -77,12 +76,12 @@ export default function VaultListScreen() {
             <View style={styles.vaultContent}>
               <Text style={[styles.vaultName, { color: colors.text }]}>{vault.name}</Text>
               <View style={styles.vaultInfo}>
-                <Text style={[styles.vaultDate, { color: colors.tabIconDefault }]}>{vault.date}</Text>
+                <Text style={[styles.vaultDate, { color: colors.icon }]}>{vault.date}</Text>
                 {vault.status === 'pending' && (
-                  <Ionicons name="time" size={16} color={colors.tabIconDefault} style={styles.statusIcon} />
+                  <Ionicons name="time" size={16} color={colors.icon} style={styles.statusIcon} />
                 )}
                 {vault.status === 'completed' && (
-                  <Ionicons name="checkmark-done" size={16} color={colors.tabIconDefault} style={styles.statusIcon} />
+                  <Ionicons name="checkmark-done" size={16} color={colors.icon} style={styles.statusIcon} />
                 )}
               </View>
             </View>
@@ -113,7 +112,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   backButton: {
     marginRight: 16,
