@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, useColorScheme, View, ScrollView } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';

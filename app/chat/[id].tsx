@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { useTheme } from '../context/ThemeContext';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { Colors } from '../constants/Colors';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 
 
 interface Vault {
@@ -51,8 +50,11 @@ export default function VaultListScreen() {
   ];
 
   const handleCreateVault = () => {
-    // Yeni vault oluşturma işlemi burada yapılacak
-    console.log('Creating new vault for:', name);
+    // Kameraya yönlendir, kullanıcı bilgilerini gönder
+    router.push({
+      pathname: '/(tabs)/camera',
+      params: { username: name, userId: id }
+    });
   };
 
   return (
