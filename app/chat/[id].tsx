@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { Colors } from '../constants/Colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Vault {
   id: string;
@@ -17,6 +18,7 @@ export default function VaultListScreen() {
   const { id, name } = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
 
   // Bu kısım blockchain'den gelecek
   const vaults: Vault[] = [
@@ -52,8 +54,8 @@ export default function VaultListScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}> 
+      <View style={[styles.header, { paddingTop: insets.top }]}> 
         <TouchableOpacity 
           onPress={() => router.back()}
           style={styles.backButton}
@@ -92,7 +94,7 @@ export default function VaultListScreen() {
       </ScrollView>
 
       <TouchableOpacity 
-        style={[styles.fab, { backgroundColor: colors.tint }]}
+        style={[styles.fab, { backgroundColor: colors.tint, bottom: insets.bottom + 20 }]}
         onPress={handleCreateVault}
       >
         <Ionicons name="add" size={24} color="white" />

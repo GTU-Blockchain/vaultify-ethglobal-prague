@@ -23,6 +23,7 @@ export default function CameraScreen() {
   const [hasStartedRecording, setHasStartedRecording] = useState(false);
   const cameraRef = useRef<any>(null);
   const videoRef = useRef<any>(null);
+
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   React.useEffect(() => {
@@ -151,6 +152,7 @@ export default function CameraScreen() {
     );
   }
 
+
   return (
     <View style={styles.container}>
       {!media ? (
@@ -246,28 +248,35 @@ export default function CameraScreen() {
               >
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
+
               <Text style={[styles.modalTitle, { color: colors.text }]}>Create New Vault</Text>
               <View style={styles.modalCloseButton} />
             </View>
             
             <Text style={[styles.inputLabel, { color: colors.text }]}>Send to @</Text>
+
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
                 color: colors.text,
               }]}
+
               placeholder="Enter username"
+
               placeholderTextColor={colors.icon}
               value={username}
               onChangeText={setUsername}
             />
 
+
             <Text style={[styles.inputLabel, { color: colors.text }]}>Flow Coins Amount</Text>
+
             <TextInput
               style={[styles.input, { 
                 backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
                 color: colors.text,
               }]}
+
               placeholder="Enter amount (min 0.0001 FLOW)"
               placeholderTextColor={colors.icon}
               value={amount}
@@ -281,12 +290,15 @@ export default function CameraScreen() {
             />
 
             <Text style={[styles.inputLabel, { color: colors.text }]}>Vault Message</Text>
+
             <TextInput
               style={[styles.input, styles.textArea, { 
                 backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
                 color: colors.text,
               }]}
+
               placeholder="Add a message to your vault (optional)"
+
               placeholderTextColor={colors.icon}
               value={description}
               onChangeText={setDescription}
@@ -295,6 +307,7 @@ export default function CameraScreen() {
             />
 
             <TouchableOpacity 
+
               style={[
                 styles.createButton, 
                 { 
@@ -304,6 +317,7 @@ export default function CameraScreen() {
               ]}
               onPress={handleCreateVault}
               disabled={!username || !amount || parseFloat(amount) < 0.0001}
+
             >
               <Text style={styles.createButtonText}>Create Vault</Text>
             </TouchableOpacity>
@@ -427,6 +441,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
@@ -451,6 +466,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
+
   },
   createButtonText: {
     color: 'white',
@@ -461,5 +477,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 20,
+
   },
-}); 
+});
