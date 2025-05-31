@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
-import { Calendar } from 'react-native-calendars';
+import { Calendar, DateData } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { useTheme } from '../context/ThemeContext';
@@ -9,7 +9,6 @@ import { useTheme } from '../context/ThemeContext';
 export default function DashboardScreen() {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
-
   // Demo user data
   const user = {
     username: 'jessica.w',
@@ -17,17 +16,16 @@ export default function DashboardScreen() {
     wallet: '0xA1b2...C3d4',
   };
 
-  // Mock vault data (sonra blockchain'den alınacak)
+  // Mock vault data (will be fetched from blockchain later)
   const vaults = [
     { date: '2025-06-01', unlocked: true },
     { date: '2025-06-03', unlocked: false },
     { date: '2025-06-07', unlocked: true },
   ];
-
-  // Aylar ve yıllar
+  // Months and years
   const monthNames = [
-    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
@@ -59,14 +57,13 @@ export default function DashboardScreen() {
     setSelectedMonth(month);
     setShowArchiveCalendar(false);
   };
-
-  // Takvim günlerini oluştur (hafta başı Pazartesi)
+  // Create calendar days (week starts on Monday)
   function getMonthMatrix(year: number, month: number) {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const matrix = [];
     let week = [];
-    let dayOfWeek = (firstDay.getDay() + 6) % 7; // Pazartesi=0
+    let dayOfWeek = (firstDay.getDay() + 6) % 7; // Monday=0
     for (let i = 0; i < dayOfWeek; i++) week.push(null);
     for (let d = 1; d <= lastDay.getDate(); d++) {
       week.push(d);
@@ -81,10 +78,9 @@ export default function DashboardScreen() {
     }
     return matrix;
   }
-
-  // Vault günlerini ay bazında gruplama
+  // Group vault days by month
   function getVaultDaysByMonth(year: number, month: number) {
-    // vaults dizisindeki ilgili yıl ve ayda olan günleri döndür
+    // Return the days in the given year and month from the vaults array
     return vaults
       .filter(v => {
         const d = new Date(v.date);
@@ -95,6 +91,76 @@ export default function DashboardScreen() {
         unlocked: v.unlocked
       }));
   }
+
+  const WeekDayHeader = () => {
+    const { colors } = useTheme();
+    return (
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 8 }}>
+        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
+          <Text 
+            key={day} 
+            style={{ 
+              color: colors.text, 
+              width: 32, 
+              textAlign: 'center', 
+              fontWeight: '500',
+              fontSize: 12,
+              opacity: 0.8
+            }}
+            numberOfLines={1}
+          >
+            {day}
+          </Text>
+        ))}
+      </View>
+    );
+  };
+
+  interface CalendarDayProps {
+    date?: DateData;
+    state?: string;
+    marking?: {
+      selected?: boolean;
+      selectedColor?: string;
+      selectedTextColor?: string;
+    };
+    theme?: {
+      textDisabledColor?: string;
+      todayTextColor?: string;
+      dayTextColor?: string;
+      textDayFontSize?: number;
+    };
+    onPress?: () => void;
+  }
+
+  const CalendarDay: React.FC<CalendarDayProps> = ({ date, state, marking, theme, onPress }) => {
+    if (!date) return null;
+    
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        style={{
+          width: 32,
+          height: 32,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 16,
+          backgroundColor: marking?.selected ? marking.selectedColor : 'transparent'
+        }}
+      >
+        <Text style={{
+          color: marking?.selected ? marking.selectedTextColor : 
+                 state === 'disabled' ? theme?.textDisabledColor :
+                 state === 'today' ? theme?.todayTextColor : 
+                 theme?.dayTextColor,
+          fontWeight: marking?.selected ? 'bold' : 'normal',
+          fontSize: theme?.textDayFontSize || 16
+        }}>
+          {date.day}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>  
@@ -107,9 +173,8 @@ export default function DashboardScreen() {
             resizeMode="contain"
           />
         </View>
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Jessica's Dashboard</Text>
+        {/* Header */}        <View style={styles.headerRow}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{user.displayName}'s Dashboard</Text>
         </View>
         {/* Account Info */}
         <View style={[styles.infoContainer, { 
@@ -129,35 +194,57 @@ export default function DashboardScreen() {
           {/* Takvim başlığı */}
           <TouchableWithoutFeedback onPress={handleMonthTitlePress}>
             <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}> 
                 {monthNames[selectedMonth]} {selectedYear}
               </Text>
             </View>
-          </TouchableWithoutFeedback>
-          <Calendar
+          </TouchableWithoutFeedback>          <Calendar
             current={calendarMonth}
             markedDates={markedDates}
-            style={{ width: '100%', alignSelf: 'center', minHeight: 320, flexGrow: 1 }}
+            style={{ 
+              width: '100%', 
+              alignSelf: 'center', 
+              minHeight: 320, 
+              flexGrow: 1,
+              backgroundColor: 'transparent'
+            }}
             theme={{
-              backgroundColor: colors.background,
-              calendarBackground: colors.background,
+              backgroundColor: 'transparent',
+              calendarBackground: 'transparent',
               textSectionTitleColor: colors.text,
               selectedDayBackgroundColor: theme === 'dark' ? '#A8E6CF' : '#4A90E2',
               selectedDayTextColor: theme === 'dark' ? '#333' : '#fff',
               todayTextColor: colors.tint,
               dayTextColor: colors.text,
-              textDisabledColor: '#d9e1e8',
+              textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
               dotColor: 'transparent',
-              arrowColor: colors.tint,
+              arrowColor: colors.text,
               monthTextColor: colors.text,
               indicatorColor: colors.tint,
               textDayFontWeight: 'bold',
               textDayFontSize: 18,
-              textDayStyle: { textAlign: 'center', alignSelf: 'center', justifyContent: 'center', marginTop: 2 },
-              selectedDotColor: 'transparent',
+              textMonthFontSize: 18,
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontSize: 14,
+              textDayHeaderFontWeight: '600',
+              
+              
             }}
+            dayComponent={({ date, state, marking }) => (
+              <CalendarDay
+                date={date}
+                state={state}
+                marking={marking}
+                theme={{
+                  textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                  todayTextColor: colors.tint,
+                  dayTextColor: colors.text,
+                  textDayFontSize: 18
+                }}
+              />
+            )}
             onMonthChange={date => {
-              setSelectedMonth(date.month - 1);
+              setSelectedMonth(date.month - 1); 
               setSelectedYear(date.year);
             }}
             hideExtraDays={false}
@@ -172,10 +259,9 @@ export default function DashboardScreen() {
           onRequestClose={() => setShowArchiveCalendar(false)}
         >
           <View style={{ flex: 1, backgroundColor: colors.background }}>
-            <View style={{ flex: 1, paddingTop: insets.top }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, marginBottom: 8 }}>
+            <View style={{ flex: 1, paddingTop: insets.top }}>              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, marginBottom: 8 }}>
                 <TouchableOpacity onPress={() => setShowArchiveCalendar(false)} style={{ padding: 8 }}>
-                  <Text style={{ color: colors.text, fontSize: 24 }}>×</Text>
+                  <Text style={[{ color: colors.text, fontSize: 24, fontWeight: '300' }]}>✕</Text>
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -201,11 +287,7 @@ export default function DashboardScreen() {
                       borderColor: colors.tint,
                     }}>
                       <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 20, textAlign: 'center', marginBottom: 8 }}>{item.name} {item.year}</Text>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4, paddingHorizontal: 12 }}>
-                        {['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map(gun => (
-                          <Text key={gun} style={{ color: colors.tabIconDefault, width: 32, textAlign: 'center', fontWeight: 'bold' }}>{gun}</Text>
-                        ))}
-                      </View>
+                      <WeekDayHeader />
                       {matrix.map((week, wIdx) => (
                         <View key={wIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 2 }}>
                           {week.map((day, dIdx) => {

@@ -18,7 +18,7 @@ export const BottomNavBar = () => {
       styles.container, 
       { 
         backgroundColor: colors.background,
-        paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
+        paddingBottom: Platform.OS === 'ios' ? insets.bottom : 30,
         borderTopColor: colors.icon,
       }
     ]}>
@@ -52,6 +52,17 @@ export const BottomNavBar = () => {
           name="location-outline" 
           size={24} 
           color={isActive('/(tabs)/location') ? colors.tint : colors.icon} 
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.navItem}
+        onPress={() => router.push('/(tabs)/dashboard')}
+      >
+        <Ionicons 
+          name="grid-outline" 
+          size={24} 
+          color={isActive('/(tabs)/dashboard') ? colors.tint : colors.icon} 
         />
       </TouchableOpacity>
     </View>

@@ -30,8 +30,19 @@ export default function Person({ name, imageUrl, onPress }: PersonProps) {
           </View>
         )}
         <View style={styles.textContainer}>
-          <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
-          <Text style={[styles.tapText, { color: colors.icon }]}>Tap to view</Text>
+          <Text 
+            style={[styles.name, { color: colors.text }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {name}
+          </Text>
+          <Text 
+            style={[styles.tapText, { color: colors.icon }]}
+            numberOfLines={1}
+          >
+            Tap to view
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
