@@ -24,7 +24,7 @@ export default function CameraScreen() {
   const cameraRef = useRef<any>(null);
   const videoRef = useRef<any>(null);
 
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimer = useRef<number | null>(null);
 
   React.useEffect(() => {
     requestPermission();
@@ -263,6 +263,7 @@ export default function CameraScreen() {
 
               placeholder="Enter username"
 
+
               placeholderTextColor={colors.icon}
               value={username}
               onChangeText={setUsername}
@@ -270,6 +271,7 @@ export default function CameraScreen() {
 
 
             <Text style={[styles.inputLabel, { color: colors.text }]}>Flow Coins Amount</Text>
+
 
             <TextInput
               style={[styles.input, { 
@@ -298,6 +300,8 @@ export default function CameraScreen() {
               }]}
 
               placeholder="Add a message to your vault (optional)"
+
+
 
               placeholderTextColor={colors.icon}
               value={description}
@@ -477,6 +481,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 20,
-
   },
-});
+}); 
+

@@ -1,17 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Platform, StatusBar, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
   onConnectWallet: () => void;
-  onToggleTheme: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onConnectWallet, onToggleTheme }) => {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+export const Header: React.FC<HeaderProps> = ({ onConnectWallet }) => {
+  const { theme, colors, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -25,10 +23,10 @@ export const Header: React.FC<HeaderProps> = ({ onConnectWallet, onToggleTheme }
       <View style={styles.leftSection}>
         <TouchableOpacity 
           style={styles.themeButton}
-          onPress={onToggleTheme}
+          onPress={toggleTheme}
         >
           <Ionicons 
-            name={colorScheme === 'dark' ? 'sunny-outline' : 'moon-outline'} 
+            name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} 
             size={24} 
             color={colors.text} 
           />
@@ -41,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({ onConnectWallet, onToggleTheme }
 
       <View style={styles.rightSection}>
         <TouchableOpacity 
-          style={styles.walletButton}
+          style={[styles.walletButton, { borderColor: colors.icon }]}
           onPress={onConnectWallet}
         >
           <Ionicons name="wallet-outline" size={20} color={colors.text} />
