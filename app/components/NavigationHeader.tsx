@@ -1,13 +1,15 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { useColorScheme } from 'react-native';
 import { Header } from './Header';
 
 export const NavigationHeader = () => {
   const colorScheme = useColorScheme();
+  const router = useRouter();
 
   const handleConnectWallet = () => {
-    // TODO: Implement wallet connection logic
-    console.log('Connect wallet pressed');
+    // Dashboard'a yönlendir
+    router.push('/dashboard');
   };
 
   const handleToggleTheme = () => {
@@ -21,4 +23,4 @@ export const NavigationHeader = () => {
       onToggleTheme={handleToggleTheme}
     />
   );
-}; 
+};

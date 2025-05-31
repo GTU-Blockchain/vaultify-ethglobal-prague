@@ -21,6 +21,7 @@ export default function TabLayout() {
           <Tabs.Screen name="chat" />
           <Tabs.Screen name="camera" />
           <Tabs.Screen name="location" />
+          <Tabs.Screen name="dashboard" />
         </Tabs>
       </View>
       <BottomNavBar />
