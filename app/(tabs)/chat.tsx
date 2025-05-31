@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import Person from '../components/Person';
 import { useTheme } from '../context/ThemeContext';
 
@@ -20,23 +20,24 @@ export default function ChatScreen() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView}>
-        {people.map((person) => (
-          <Person
-            key={person.id}
-            name={person.name}
-            onPress={() => router.push(`/chat/${person.id}?name=${person.name}`)}
-          />
-        ))}
-      </ScrollView>
-    </View>
+    <ScrollView
+      style={[styles.scrollView, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.container}
+    >
+      {people.map((person) => (
+        <Person
+          key={person.id}
+          name={person.name}
+          onPress={() => router.push(`/chat/${person.id}?name=${person.name}`)}
+        />
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
   },
   scrollView: {
     flex: 1,

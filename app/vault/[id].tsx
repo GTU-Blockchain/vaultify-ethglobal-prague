@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ResizeMode, Video } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 
@@ -66,7 +66,16 @@ export default function VaultDetailScreen() {
     const unlock = new Date(vault.unlockDate);
     const diff = unlock.getTime() - now.getTime();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return `${days} gün kaldı`;
+    return `${days} days remaining`;
+  };
+
+  const handleError = (message: string) => {
+    Alert.alert(
+      'Error',
+      message,
+      [{ text: 'OK' }],
+      { cancelable: true }
+    );
   };
 
   return (
@@ -76,8 +85,7 @@ export default function VaultDetailScreen() {
           onPress={() => router.back()} 
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-          <Text style={[styles.headerText, { color: colors.text }]}>Geri</Text>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />          <Text style={[styles.headerText, { color: colors.text }]}>Back</Text>
         </TouchableOpacity>
       </View>
 
@@ -96,39 +104,46 @@ export default function VaultDetailScreen() {
             </View>
             <View style={[styles.statusBadge, { 
               backgroundColor: vault.unlocked ? '#A8E6CF' : '#FF8B94',
-            }]}>
-              <Text style={{ 
+            }]}>              <Text style={{ 
                 color: '#222',
                 fontWeight: 'bold'
-              }}>{vault.unlocked ? 'Açık' : 'Kilitli'}</Text>
+              }}>{vault.unlocked ? 'Open' : 'Locked'}</Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={[styles.label, { color: colors.icon }]}>Gönderen</Text>
+            <Text style={[styles.label, { color: colors.icon }]}>Sender</Text>
             <Text style={[styles.value, { color: colors.text }]}>{vault.sender}</Text>
           </View>
           
           <View style={styles.infoRow}>
-            <Text style={[styles.label, { color: colors.icon }]}>Alıcı</Text>
+            <Text style={[styles.label, { color: colors.icon }]}>Recipient</Text>
             <Text style={[styles.value, { color: colors.text }]}>{vault.recipient}</Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={[styles.label, { color: colors.icon }]}>Miktar</Text>
+            <Text style={[styles.label, { color: colors.icon }]}>Amount</Text>
             <Text style={[styles.value, { color: colors.text }]}>{vault.amount}</Text>
-          </View>
-
-          {!vault.unlocked && (
+          </View>          {!vault.unlocked && (
             <View style={styles.infoRow}>
-              <Text style={[styles.label, { color: colors.icon }]}>Kalan Süre</Text>
+              <Text style={[styles.label, { color: colors.icon }]}>Time Left</Text>
               <Text style={[styles.value, { color: colors.tint }]}>{remainingTime()}</Text>
             </View>
           )}
 
           {vault.unlocked && vault.message && (
-            <View style={[styles.messageContainer, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
-              <Text style={[styles.message, { color: colors.text }]}>{vault.message}</Text>
+            <View style={[styles.messageContainer, { 
+              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
+            }]}>
+              <Text 
+                style={[styles.message, { 
+                  color: colors.text 
+                }]}
+                numberOfLines={0} // Makes it multiline
+                ellipsizeMode="tail"
+              >
+                {vault.message}
+              </Text>
             </View>
           )}
 
@@ -156,10 +171,12 @@ export default function VaultDetailScreen() {
 
           <View style={[styles.footer, { borderTopColor: colors.icon + '20' }]}>
             <Text style={[styles.date, { color: colors.icon }]}>
-              Oluşturulma: {new Date(vault.createdAt).toLocaleDateString()}
+              <Text style={{ fontWeight: '500' }}>Created: </Text>
+              {new Date(vault.createdAt).toLocaleDateString()}
             </Text>
             <Text style={[styles.date, { color: colors.icon }]}>
-              Açılış: {new Date(vault.unlockDate).toLocaleDateString()}
+              <Text style={{ fontWeight: '500' }}>Unlocks: </Text>
+              {new Date(vault.unlockDate).toLocaleDateString()}
             </Text>
           </View>
         </View>
@@ -215,11 +232,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
+    fontWeight: '500',
     marginBottom: 4,
   },
   value: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   messageContainer: {
     padding: 16,
@@ -229,6 +247,7 @@ const styles = StyleSheet.create({
   message: {
     fontSize: 16,
     lineHeight: 24,
+    fontWeight: '400',
   },
   mediaContainer: {
     marginTop: 16,
@@ -250,5 +269,6 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 12,
+    lineHeight: 16,
   },
 });
