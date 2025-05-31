@@ -5,6 +5,7 @@ import { Slot, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Polyfill crypto.getRandomValues
 if (typeof global.crypto === 'undefined') {
@@ -73,12 +74,14 @@ export default function RootLayout() {
   if (!isReady) {
     // You can show a loading screen here
     return (
-      <SafeAreaProvider>
-      <Slot />
-      <View style={styles.container}>
+    <ThemeProvider>
+        <SafeAreaProvider>
+        <Slot />
+        <View style={styles.container}>
         {/* Add a loading spinner or splash screen here if needed */}
       </View>
       </SafeAreaProvider>
+    </ThemeProvider>
     );
   }
 

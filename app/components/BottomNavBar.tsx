@@ -1,33 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { usePathname, useRouter } from 'expo-router';
 import React from 'react';
-import { Platform, StyleSheet, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export const BottomNavBar = () => {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
   const isActive = (path: string) => pathname === path;
 
-  // Create a slightly lighter background color
-  const navbarBackground = colorScheme === 'dark' 
-    ? 'rgba(255, 255, 255, 0.05)' 
-    : 'rgba(0, 0, 0, 0.02)';
-
   return (
     <View style={[
       styles.container, 
       { 
-        backgroundColor: navbarBackground,
+        backgroundColor: colors.background,
         paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
-        borderTopColor: colorScheme === 'dark' 
-          ? 'rgba(255, 255, 255, 0.1)' 
-          : 'rgba(0, 0, 0, 0.1)',
+        borderTopColor: colors.icon,
       }
     ]}>
       <TouchableOpacity 

@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { Colors } from '../constants/Colors';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+
 
 interface Vault {
   id: string;
@@ -15,8 +17,9 @@ interface Vault {
 
 export default function VaultListScreen() {
   const { id, name } = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors, theme } = useTheme();
+  const insets = useSafeAreaInsets();
+
 
   // Bu kısım blockchain'den gelecek
   const vaults: Vault[] = [
@@ -47,13 +50,19 @@ export default function VaultListScreen() {
   ];
 
   const handleCreateVault = () => {
-    // Yeni vault oluşturma işlemi burada yapılacak
-    console.log('Creating new vault for:', name);
+    // Kameraya yönlendir, kullanıcı bilgilerini gönder
+    router.push({
+      pathname: '/(tabs)/camera',
+      params: { username: name, userId: id }
+    });
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+<View style={[styles.container, { backgroundColor: colors.background }]}>
+  <View style={[
+    styles.header,
+    { borderBottomColor: colors.icon + '20', paddingTop: insets.top }
+  ]}>
         <TouchableOpacity 
           onPress={() => router.back()}
           style={styles.backButton}
@@ -62,37 +71,45 @@ export default function VaultListScreen() {
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>{name}</Text>
       </View>
-      
-      <ScrollView style={styles.scrollView}>
-        {vaults.map((vault) => (
-          <TouchableOpacity 
+        <ScrollView style={styles.scrollView}>
+        {vaults.map((vault) => (          <TouchableOpacity 
             key={vault.id}
             style={[
               styles.vaultItem, 
               vault.isSent ? styles.sentVault : styles.receivedVault,
-              { backgroundColor: colors.tint + '20' }
+              { 
+                backgroundColor: theme === 'dark' 
+                  ? vault.isSent ? 'rgba(0, 255, 127, 0.1)' : 'rgba(70, 130, 180, 0.1)'
+                  : vault.isSent ? 'rgba(46, 139, 87, 0.08)' : 'rgba(70, 130, 180, 0.08)'
+              }
             ]}
-            onPress={() => console.log('Opening vault:', vault.id)}
+            onPress={() => router.push(`/vault/${vault.id}`)}
           >
             <View style={styles.vaultContent}>
               <Text style={[styles.vaultName, { color: colors.text }]}>{vault.name}</Text>
               <View style={styles.vaultInfo}>
-                <Text style={[styles.vaultDate, { color: colors.tabIconDefault }]}>{vault.date}</Text>
+                <Text style={[styles.vaultDate, { color: colors.icon }]}>{vault.date}</Text>
                 {vault.status === 'pending' && (
-                  <Ionicons name="time" size={16} color={colors.tabIconDefault} style={styles.statusIcon} />
+                  <Ionicons name="time" size={18} color={colors.icon} style={styles.statusIcon} />
                 )}
                 {vault.status === 'completed' && (
-                  <Ionicons name="checkmark-done" size={16} color={colors.tabIconDefault} style={styles.statusIcon} />
+                  <Ionicons name="checkmark-done" size={18} color={colors.icon} style={styles.statusIcon} />
                 )}
               </View>
             </View>
-            <Ionicons name="lock-closed" size={24} color={colors.tint} />
+            <View style={{ opacity: 0.9 }}>
+              <Ionicons 
+                name={vault.status === 'completed' ? "lock-closed" : "time-outline"} 
+                size={28} 
+                color={colors.icon} 
+              />
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
       <TouchableOpacity 
-        style={[styles.fab, { backgroundColor: colors.tint }]}
+        style={[styles.fab, { backgroundColor: colors.tint, bottom: insets.bottom + 20 }]}
         onPress={handleCreateVault}
       >
         <Ionicons name="add" size={24} color="white" />
@@ -113,7 +130,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   backButton: {
     marginRight: 16,
@@ -122,52 +138,46 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-  },
-  scrollView: {
+  },  scrollView: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   vaultItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    marginBottom: 12,
+    padding: 20,
+    marginVertical: 8,
     borderRadius: 12,
-    maxWidth: '75%',
-    minWidth: 280,
+    width: '95%',
+    alignSelf: 'center',
   },
   sentVault: {
-    alignSelf: 'flex-end',
-    borderTopRightRadius: 4,
+    backgroundColor: 'rgba(46, 139, 87, 0.08)', // Sea Green with opacity
   },
   receivedVault: {
-    alignSelf: 'flex-start',
-    borderTopLeftRadius: 4,
+    backgroundColor: 'rgba(70, 130, 180, 0.08)', // Steel Blue with opacity
   },
   vaultContent: {
     flex: 1,
-    marginRight: 12,
-    minWidth: 0,
+    marginRight: 16,
   },
   vaultName: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-    flexShrink: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   vaultInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
   },
   vaultDate: {
-    fontSize: 12,
-    flexShrink: 1,
+    fontSize: 13,
+    opacity: 0.8,
   },
   statusIcon: {
-    marginLeft: 4,
-    marginVertical: 2,
+    marginLeft: 8,
   },
   fab: {
     position: 'absolute',

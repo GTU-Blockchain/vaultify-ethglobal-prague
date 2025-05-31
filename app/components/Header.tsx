@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Platform, StatusBar, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
   onConnectWallet: () => void;
@@ -10,8 +10,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onConnectWallet, onToggleTheme }) => {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { theme, colors, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -25,10 +24,10 @@ export const Header: React.FC<HeaderProps> = ({ onConnectWallet, onToggleTheme }
       <View style={styles.leftSection}>
         <TouchableOpacity 
           style={styles.themeButton}
-          onPress={onToggleTheme}
+          onPress={toggleTheme}
         >
           <Ionicons 
-            name={colorScheme === 'dark' ? 'sunny-outline' : 'moon-outline'} 
+            name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} 
             size={24} 
             color={colors.text} 
           />
@@ -41,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({ onConnectWallet, onToggleTheme }
 
       <View style={styles.rightSection}>
         <TouchableOpacity 
-          style={styles.walletButton}
+          style={[styles.walletButton, { borderColor: colors.icon }]}
           onPress={onConnectWallet}
         >
           <Ionicons name="wallet-outline" size={20} color={colors.text} />
@@ -57,11 +56,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: '4%',
-    paddingVertical: '2%',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.1)',
-    minHeight: 60,
+    minHeight: 70,
   },
   leftSection: {
     flex: 1,
@@ -83,10 +82,9 @@ const styles = StyleSheet.create({
   walletButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: '1.5%',
+    padding: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
     minWidth: 80,
     justifyContent: 'center',
   },
@@ -96,9 +94,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   themeButton: {
-    padding: '2%',
+    padding: 8,
     borderRadius: 8,
     minWidth: 40,
     alignItems: 'center',
   },
-}); 
+});

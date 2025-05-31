@@ -2,29 +2,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as MediaLibrary from 'expo-media-library';
+import { router, useLocalSearchParams } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
-import {
-  Alert,
-  Image,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View
-} from 'react-native';
+import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useWalletConnect } from '../../hooks/useWalletConnect';
+import { BottomNavBar } from '../components/BottomNavBar';
 import { Colors } from '../constants/Colors';
 
 interface MediaState {
   uri: string;
   type: 'photo' | 'video';
 }
+import { useTheme } from '../context/ThemeContext';
 
 export default function CameraScreen() {
+  const { username: routeUsername } = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -54,9 +50,13 @@ export default function CameraScreen() {
   // Form states
   const [usernameInput, setUsernameInput] = useState('');
   
+  const [isVideoMode, setIsVideoMode] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const videoRef = useRef<Video>(null);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const longPressTimer = useRef<number | null>(null);
+
+  const { theme } = useTheme();
   const recordingTimer = useRef<NodeJS.Timeout | null>(null);
 
   const handleWalletConnect = () => {
@@ -120,18 +120,56 @@ export default function CameraScreen() {
           setRecordingTime(prev => prev + 1);
         }, 1000);
 
-        const video = await cameraRef.current.recordAsync({
+        const recording = await cameraRef.current.recordAsync({
           maxDuration: 60
         });
         
         if (video) {
-          setMedia({ uri: video.uri, type: 'video' });
+          console.log('Recording completed:', recording);
+        if (recording && recording.uri) {
+          setMedia({ uri: recording.uri, type: 'video' });
         }
+        }
+        setIsRecording(false);
+        setIsLongPressing(false);
+        setHasStartedRecording(false);
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error('Error recording video:', errorMessage);
+        console.error('Error during recording:', errorMessage);
         Alert.alert('Error', 'Failed to record video. Please try again.');
-      } finally {
+        setIsRecording(false);
+        setIsLongPressing(false);
+        setHasStartedRecording(false);
+        setRecordingTime(0);
+        if (recordingTimer.current) {
+          clearInterval(recordingTimer.current);
+        }
+      }
+    }
+  };
+
+  const stopRecording = async () => {
+    if (cameraRef.current && isRecording) {
+      try {
+        await cameraRef.current.stopRecording();
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        console.error('Error stopping recording:', errorMessage);
+      }
+    }
+  };
+
+  const stopRecording = async () => {
+    if (cameraRef.current && isRecording) {
+      try {
+        console.log('Stopping recording...');
+        await cameraRef.current.stopRecording();
+        setIsRecording(false);
+        setIsLongPressing(false);
+        setHasStartedRecording(false);
+      } catch (error) {
+        console.error('Error stopping video:', error);
+        Alert.alert('Error', 'Failed to save video. Please try again.');
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
@@ -155,18 +193,30 @@ export default function CameraScreen() {
   };
 
   const handlePressIn = () => {
+    if (isVideoMode) {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+      return;
+    }
+    
     setIsLongPressing(true);
     longPressTimer.current = setTimeout(() => {
       startRecording();
-    }, 500); // Start recording after 500ms long press
+    }, 1000);
   };
 
   const handlePressOut = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
-    
-    if (isLongPressing && !hasStartedRecording) {
+
+    setIsLongPressing(false);
+
+    if (!isVideoMode && !isRecording) {
       takePhoto();
     } else if (isRecording) {
       stopRecording();
@@ -175,19 +225,53 @@ export default function CameraScreen() {
     setIsLongPressing(false);
   };
 
-  if (!permission?.granted) {
+  const handleCreateVault = () => {
+    setShowVaultModal(false);
+    router.push('/chat/1');
+  };
+
+  const toggleCameraType = () => {
+    setCameraType(current => current === 'back' ? 'front' : 'back');
+  };
+
+  const handleSavePhoto = async () => {
+    if (!media) return;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please grant media library permissions to save photos.');
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(media.uri);
+      Alert.alert('Saved', 'Photo saved to your camera roll!');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save photo.');
+    }
+  };
+
+  const handleSharePhoto = async () => {
+    if (!media) return;
+    try {
+      await Sharing.shareAsync(media.uri);
+    } catch (e) {
+      Alert.alert('Error', 'Could not share photo.');
+    }
+  };
+
+  if (!permission) {
+    return <View style={styles.container} />;
+  }
+  if (!permission.granted) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <Text style={[styles.text, { color: colors.text }]}>Camera permission required</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <Text style={[styles.errorText, { color: colors.text }]}>No access to camera</Text>
       </View>
     );
   }
 
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {!media ? (
         <View style={styles.container}>
           <CameraView ref={cameraRef} style={styles.camera} facing={cameraType} />
@@ -212,20 +296,106 @@ export default function CameraScreen() {
                 styles.captureInner,
                 isRecording && styles.recordingInner
               ]} />
+              
             </TouchableOpacity>
-            {isRecording && (
-              <View style={styles.recordingIndicator}>
-                <View style={styles.recordingDot} />
-                <Text style={styles.recordingTime}>
-                  {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
-                </Text>
-              </View>
-            )}
+            <View style={styles.modeIndicator}>
+              <TouchableOpacity 
+                onPress={() => setIsVideoMode(false)}
+                style={styles.modeButton}
+              >
+                <Text style={[
+                  styles.modeText, 
+                  { 
+                    color: colors.text,
+                    fontWeight: !isVideoMode ? '600' : '400',
+                    textShadowColor: theme === 'dark' ? '#000' : '#fff',
+                    textShadowOffset: { width: 0.5, height: 0.5 },
+                    textShadowRadius: 1,
+                  }
+                ]}>Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setIsVideoMode(true)}
+                style={styles.modeButton}
+              >
+                <Text style={[
+                  styles.modeText, 
+                  { 
+                    color: colors.text,
+                    fontWeight: isVideoMode ? '600' : '400',
+                    textShadowColor: theme === 'dark' ? '#000' : '#fff',
+                    textShadowOffset: { width: 0.5, height: 0.5 },
+                    textShadowRadius: 1,
+                  }
+                ]}>Video</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       ) : (
         <View style={styles.previewContainer}>
-          <Image source={{ uri: media.uri }} style={styles.preview} />
+          {media.type === 'photo' ? (
+            <>
+              <Image 
+                source={{ uri: media.uri }} 
+                style={styles.preview}
+                resizeMode="contain"
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 16 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.tint,
+                    padding: 12,
+                    borderRadius: 8,
+                    marginHorizontal: 8,
+                  }}
+                  onPress={handleSavePhoto}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Save to Device</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.tint,
+                    padding: 12,
+                    borderRadius: 8,
+                    marginHorizontal: 8,
+                  }}
+                  onPress={handleSharePhoto}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View style={styles.videoContainer}>
+              <Video
+                ref={videoRef}
+                source={{ uri: media.uri }}
+                style={styles.video}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
+                isLooping
+                shouldPlay={false}
+                isMuted={false}
+                onError={(error: string) => {
+                  console.error('Video Error:', error);
+                  Alert.alert('Error', 'Failed to play video. Please try again.');
+                }}
+              />
+              <View style={styles.videoControls}>
+                <TouchableOpacity 
+                  style={[styles.playButton, { backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57' }]}
+                  onPress={() => {
+                    if (videoRef.current) {
+                      videoRef.current.playAsync();
+                    }
+                  }}
+                >
+                  <Ionicons name="play" size={24} color="white" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           <TouchableOpacity 
             style={[styles.actionButton, { top: insets.top + 20, left: 20 }]}
             onPress={() => setMedia(null)}
@@ -235,37 +405,101 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {/* Username Registration Modal */}
-      <Modal visible={showUsernameModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modal, { backgroundColor: colors.background }]}>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showVaultModal}
+        onRequestClose={() => setShowVaultModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { 
+            backgroundColor: theme === 'dark' ? colors.background : '#F0FFF0',
+            borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20',
+            shadowColor: theme === 'dark' ? 'transparent' : '#1B3B4B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 5
+          }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Register Username</Text>
-              <TouchableOpacity onPress={() => setShowUsernameModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
+              <Text style={[styles.modalTitle, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Create New Vault</Text>
+              <TouchableOpacity onPress={() => setShowVaultModal(false)}>
+                <Ionicons name="close" size={24} color={theme === 'dark' ? colors.text : '#1B3B4B'} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalContent}>
-              <Text style={[styles.description, { color: colors.text }]}>
-                Choose a unique username for your account
-              </Text>
-              
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Vault Name</Text>
               <TextInput
-                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.text, color: colors.text }]}
-                placeholder="Enter username (3-20 characters)"
-                placeholderTextColor={colors.icon}
-                value={usernameInput}
-                onChangeText={setUsernameInput}
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter vault name"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
               />
-
-              <TouchableOpacity style={styles.primaryButton} onPress={handleRegisterUsername}>
-                <Text style={styles.buttonText}>Register Username</Text>
-              </TouchableOpacity>
             </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Unlock Date</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={amount}
+                onChangeText={(text) => {
+                  const regex = /^\d*\.?\d*$/;
+                  if (regex.test(text)) {
+                    setAmount(text);
+                  }
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Content</Text>
+              <TextInput
+                style={[styles.input, styles.textArea, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Enter your message"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createButton, { 
+                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
+                marginTop: 16,
+                shadowColor: theme === 'dark' ? 'transparent' : '#2E8B57',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 3
+              }]}
+              onPress={handleCreateVault}
+            >
+              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Create Vault</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      <BottomNavBar />
     </View>
   );
 }
@@ -314,24 +548,110 @@ const styles = StyleSheet.create({
   },
   recordingIndicator: {
     position: 'absolute',
-    top: -40,
-    flexDirection: 'row',
+    left: 20,
+    padding: 10,
+  },
+  sendButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 25,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    padding: 20,
   },
-  recordingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'red',
-    marginRight: 8,
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
   },
-  recordingTime: {
-    color: 'white',
-    fontSize: 14,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  createButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  modeIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 24,
+  },
+  modeButton: {
+    padding: 8,
+  },
+  modeText: {
+    fontSize: 16,
+  },
+  videoControls: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
