@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, useColorScheme } from 'react-native';
 import { Colors } from '../constants/Colors';
 
 interface PersonProps {

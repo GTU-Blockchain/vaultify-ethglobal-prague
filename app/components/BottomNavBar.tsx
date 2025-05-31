@@ -78,4 +78,4 @@ const styles = StyleSheet.create({
     minWidth: 50,
     alignItems: 'center',
   },
-}); 
+});

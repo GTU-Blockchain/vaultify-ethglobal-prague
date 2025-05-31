@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 import { BottomNavBar } from '../components/BottomNavBar';
@@ -19,24 +18,9 @@ export default function TabLayout() {
             tabBarStyle: { display: 'none' },
           }}
         >
-          <Tabs.Screen
-            name="chat"
-            options={{
-              tabBarIcon: ({ color }) => <Ionicons name="chatbubble-outline" size={24} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="camera"
-            options={{
-              tabBarIcon: ({ color }) => <Ionicons name="camera-outline" size={32} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="location"
-            options={{
-              tabBarIcon: ({ color }) => <Ionicons name="location-outline" size={24} color={color} />,
-            }}
-          />
+          <Tabs.Screen name="chat" />
+          <Tabs.Screen name="camera" />
+          <Tabs.Screen name="location" />
         </Tabs>
       </View>
       <BottomNavBar />

@@ -8,8 +8,6 @@ export default function ChatScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-
-// Sample data for demonstration
   const people = [
     { id: '1', name: 'Sophia' },
     { id: '2', name: 'Ethan' },
@@ -23,7 +21,8 @@ export default function ChatScreen() {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>      <ScrollView style={styles.scrollView}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView style={styles.scrollView}>
         {people.map((person) => (
           <Person
             key={person.id}
@@ -32,7 +31,6 @@ export default function ChatScreen() {
           />
         ))}
       </ScrollView>
-     
     </View>
   );
 }

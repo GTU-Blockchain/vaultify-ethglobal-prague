@@ -104,6 +104,9 @@ export default function VaultListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
@@ -129,9 +132,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     borderRadius: 12,
-    maxWidth: '80%',
+    maxWidth: '75%',
+    minWidth: 280,
   },
   sentVault: {
     alignSelf: 'flex-end',
@@ -144,21 +148,26 @@ const styles = StyleSheet.create({
   vaultContent: {
     flex: 1,
     marginRight: 12,
+    minWidth: 0,
   },
   vaultName: {
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 4,
+    flexShrink: 1,
   },
   vaultInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   vaultDate: {
     fontSize: 12,
+    flexShrink: 1,
   },
   statusIcon: {
     marginLeft: 4,
+    marginVertical: 2,
   },
   fab: {
     position: 'absolute',
