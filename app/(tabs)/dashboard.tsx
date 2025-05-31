@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, useColorScheme, View, ScrollView } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';
@@ -10,6 +10,9 @@ export default function DashboardScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+
+  // BottomNavBar yüksekliği sabiti
+  const BOTTOM_NAVBAR_HEIGHT = 70;
 
   // Demo user data
   const user = {
@@ -38,57 +41,58 @@ export default function DashboardScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 8 }]}>  
-     
-      {/* Dashboard Image */}
-      <View style={styles.imageContainer}>
-        <Image
-          source={require('../../assets/images/vault-illustration.png')}
-          style={[styles.dashboardImage, { width: '100%', maxWidth: 400, height: 180 }]}
-          resizeMode="contain"
-        />
-      </View>
-    {/* Header */}
-      <View style={styles.headerRow}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Jessica's Dashboard</Text>
-      </View>
-      {/* Account Info */}
-      <View style={styles.infoRow}>
-        <Text style={[styles.infoLabel, { color: colors.text }]}>Wallet</Text>
-        <Text style={[styles.infoValue, { color: colors.text }]}>{user.wallet}</Text>
-      </View>
-    {/* Takvim */}
-      <View style={styles.calendarContainer}>
-        <Calendar
-          markedDates={markedDates}
-          theme={{
-            backgroundColor: colors.background,
-            calendarBackground: colors.background,
-            textSectionTitleColor: colors.text,
-            selectedDayBackgroundColor: '#A8E6CF',
-            selectedDayTextColor: '#333',
-            todayTextColor: colors.tint,
-            dayTextColor: colors.text,
-            textDisabledColor: '#d9e1e8',
-            dotColor: 'transparent',
-            arrowColor: colors.tint,
-            monthTextColor: colors.text,
-            indicatorColor: colors.tint,
-            textDayFontWeight: 'bold',
-            textDayFontSize: 18,
-            textDayStyle: { textAlign: 'center', alignSelf: 'center', justifyContent: 'center', marginTop: 2 },
-            // marginTop ile yuvarlakları aşağı kaydırdık
-            selectedDotColor: 'transparent',
-          }}
-        />
-      </View>
-      {/* Disconnect Wallet Button */}
-      <View style={styles.disconnectButtonContainer}>
-        <TouchableOpacity style={[styles.disconnectButton, { backgroundColor: colors.tabIconDefault }]}
-          onPress={() => router.push('/dashboard')}
-        >  
-          <Text style={[styles.disconnectText, { color: colors.text }]}>Disconnect Wallet</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
+        {/* Dashboard Image */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('../../assets/images/vault-illustration.png')}
+            style={[styles.dashboardImage, { width: '100%', maxWidth: 400, height: 180 }]}
+            resizeMode="contain"
+          />
+        </View>
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Jessica's Dashboard</Text>
+        </View>
+        {/* Account Info */}
+        <View style={styles.infoRow}>
+          <Text style={[styles.infoLabel, { color: colors.text }]}>Wallet</Text>
+          <Text style={[styles.infoValue, { color: colors.text }]}>{user.wallet}</Text>
+        </View>
+        {/* Takvim */}
+        <View style={styles.calendarContainer}>
+          <Calendar
+            markedDates={markedDates}
+            style={{ width: '100%', alignSelf: 'center', minHeight: 320, flexGrow: 1 }}
+            theme={{
+              backgroundColor: colors.background,
+              calendarBackground: colors.background,
+              textSectionTitleColor: colors.text,
+              selectedDayBackgroundColor: '#A8E6CF',
+              selectedDayTextColor: '#333',
+              todayTextColor: colors.tint,
+              dayTextColor: colors.text,
+              textDisabledColor: '#d9e1e8',
+              dotColor: 'transparent',
+              arrowColor: colors.tint,
+              monthTextColor: colors.text,
+              indicatorColor: colors.tint,
+              textDayFontWeight: 'bold',
+              textDayFontSize: 18,
+              textDayStyle: { textAlign: 'center', alignSelf: 'center', justifyContent: 'center', marginTop: 2 },
+              selectedDotColor: 'transparent',
+            }}
+          />
+        </View>
+        {/* Disconnect Wallet Button */}
+        <View style={[styles.disconnectButtonContainerFixed, { marginBottom: insets.bottom + 16 }]}> 
+          <TouchableOpacity style={[styles.disconnectButton, { backgroundColor: colors.tabIconDefault }]}
+            onPress={() => router.push('/dashboard')}
+          >  
+            <Text style={[styles.disconnectText, { color: colors.text }]}>Disconnect Wallet</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
       <BottomNavBar />
     </View>
   );
@@ -134,14 +138,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
-  disconnectButtonContainer: {
+  disconnectButtonContainerFixed: {
     width: '100%',
     alignItems: 'center',
-    position: 'absolute',
-    bottom: 100, // BottomNavBar'ın üstünde kalacak şekilde
-    left: 0,
-    right: 0,
-    zIndex: 2,
+    marginTop: 16,
+    marginBottom: 90, // BottomNavBar'ın üstünde boşluk bırak
   },
   disconnectButton: {
     paddingHorizontal: 24,
