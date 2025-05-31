@@ -1,3 +1,4 @@
+
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import { Stack } from 'expo-router';
@@ -13,6 +14,8 @@ if (typeof global.crypto === 'undefined') {
     randomUUID: undefined
   };
 }
+
+
 
 export default function RootLayout() {
   const [walletConnectInitialized, setWalletConnectInitialized] = useState(false);
@@ -57,25 +60,8 @@ export default function RootLayout() {
   };
 
   return (
-    <View style={styles.container}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen 
-          name="(tabs)" 
-          options={{ 
-            headerShown: false,
-          }} 
-        />
-      </Stack>
-    </View>
+    <SafeAreaProvider>
+      <Slot />
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-}); 
