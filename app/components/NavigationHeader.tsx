@@ -1,8 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  ActivityIndicator, 
+  Alert, 
+  Linking, 
+  Modal, 
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  useColorScheme, 
+  View 
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useUsername } from '../../hooks/useUsername';
 import { useWalletConnect } from '../../hooks/useWalletConnect';
 import { Colors } from '../constants/Colors';
 
@@ -11,36 +21,66 @@ export const NavigationHeader = () => {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   
-  // Wallet and username hooks
+  // Use the unified wallet hook
   const {
     isConnected,
     address,
     balance,
     isLoading,
     error,
+    username,
+    isRegistered,
+    isOnFlowTestnet,
     connect,
-    disconnect
+    disconnect,
+    reconnect,
+    switchToFlowTestnet,
+    registerUsername,
+    checkUsernameAvailability,
+    clearError
   } = useWalletConnect();
-  const username = useUsername(isConnected ? address : null);
   
   // UI states
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
-  const [showPrivateKeyInput, setShowPrivateKeyInput] = useState(false);
-  const [privateKeyInput, setPrivateKeyInput] = useState('');
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
 
-  // Load username when wallet connects
-  React.useEffect(() => {
-    if (isConnected && address) {
-      username.loadUsername(address);
+  // Auto-show username modal if connected but not registered
+  useEffect(() => {
+    if (isConnected && isOnFlowTestnet && !isRegistered && !isLoading && !showUsernameModal) {
+      setShowUsernameModal(true);
     }
-  }, [isConnected, address]);
+  }, [isConnected, isOnFlowTestnet, isRegistered, isLoading, showUsernameModal]);
+
+  // Check username availability with debouncing
+  useEffect(() => {
+    if (!usernameInput || usernameInput.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setIsCheckingUsername(true);
+      try {
+        const available = await checkUsernameAvailability(usernameInput);
+        setUsernameAvailable(available);
+      } catch (error) {
+        console.error('Error checking username availability:', error);
+        setUsernameAvailable(null);
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [usernameInput, checkUsernameAvailability]);
 
   const handleWalletPress = () => {
     if (!isConnected) {
       handleConnect();
-    } else if (!username.username) {
+    } else if (!isRegistered) {
       setShowUsernameModal(true);
     } else {
       setShowWalletModal(true);
@@ -49,10 +89,12 @@ export const NavigationHeader = () => {
 
   const handleConnect = async () => {
     try {
+      clearError();
       await connect();
       setShowWalletModal(false);
     } catch (err) {
       console.error('Failed to connect wallet:', err);
+      Alert.alert('Connection Failed', 'Failed to connect wallet. Please try again.');
     }
   };
 
@@ -60,26 +102,19 @@ export const NavigationHeader = () => {
     try {
       await disconnect();
       setShowWalletModal(false);
+      setShowUsernameModal(false);
     } catch (err) {
       console.error('Failed to disconnect wallet:', err);
+      Alert.alert('Disconnect Failed', 'Failed to disconnect wallet.');
     }
   };
 
-  const handleConnectWithPrivateKey = async () => {
-    if (!privateKeyInput.trim()) {
-      Alert.alert('Error', 'Please enter a private key');
-      return;
-    }
-
+  const handleSwitchNetwork = async () => {
     try {
-      await connect();
-      setPrivateKeyInput('');
-      setShowPrivateKeyInput(false);
-      setShowWalletModal(false);
-      Alert.alert('✅ Success', 'Wallet connected successfully!');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      Alert.alert('Error', errorMessage);
+      await switchToFlowTestnet();
+    } catch (err) {
+      console.error('Failed to switch network:', err);
+      Alert.alert('Network Switch Failed', 'Please switch to Flow testnet manually in MetaMask.');
     }
   };
 
@@ -89,14 +124,47 @@ export const NavigationHeader = () => {
       return;
     }
 
+    if (usernameInput.length < 3) {
+      Alert.alert('Error', 'Username must be at least 3 characters');
+      return;
+    }
+
+    if (usernameAvailable !== true) {
+      Alert.alert('Error', 'Please choose an available username');
+      return;
+    }
+
     try {
-      await username.registerUsername(usernameInput.trim());
+      await registerUsername(usernameInput.trim());
       setUsernameInput('');
       setShowUsernameModal(false);
       Alert.alert('✅ Success', 'Username registered successfully!');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      Alert.alert('Error', errorMessage);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      
+      // Offer reconnection if it's a wallet connection issue
+      if (error.message?.includes('connection') || error.message?.includes('no such account')) {
+        Alert.alert(
+          'Connection Issue',
+          'There seems to be a wallet connection issue. Would you like to try reconnecting?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Reconnect', 
+              onPress: async () => {
+                try {
+                  await reconnect();
+                  Alert.alert('Success', 'Wallet reconnected. Please try registering again.');
+                } catch (reconnectError: any) {
+                  Alert.alert('Error', reconnectError.message || 'Failed to reconnect');
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Registration Failed', error.message || 'Failed to register username');
+      }
     }
   };
 
@@ -107,7 +175,7 @@ export const NavigationHeader = () => {
       '💧 Get Testnet FLOW',
       `Go to Flow Faucet and request tokens for:\n\n${address}`,
       [
-        { text: 'Open Faucet', onPress: () => Linking.openURL(`https://testnet-faucet.onflow.org/${address}`) },
+        { text: 'Open Faucet', onPress: () => Linking.openURL(`https://testnet-faucet.onflow.org/`) },
         { text: 'Cancel' }
       ]
     );
@@ -115,14 +183,22 @@ export const NavigationHeader = () => {
 
   const getWalletStatusText = () => {
     if (!isConnected) return '';
-    if (!username.username) return address?.slice(0, 6) + '...';
-    return `@${username.username}`;
+    if (!isRegistered) return address?.slice(0, 6) + '...';
+    return `@${username}`;
   };
 
   const getWalletStatusColor = () => {
     if (!isConnected) return colors.icon;
-    if (!username.username) return '#17a2b8';
-    return '#28a745';
+    if (!isOnFlowTestnet) return '#ff6b6b'; // Red for wrong network
+    if (!isRegistered) return '#17a2b8'; // Blue for connected but no username
+    return '#28a745'; // Green for fully set up
+  };
+
+  const getWalletIcon = () => {
+    if (!isConnected) return "wallet-outline";
+    if (!isOnFlowTestnet) return "warning-outline";
+    if (!isRegistered) return "person-add-outline";
+    return "checkmark-circle-outline";
   };
 
   return (
@@ -148,7 +224,7 @@ export const NavigationHeader = () => {
         ) : (
           <>
             <Ionicons 
-              name={isConnected ? "wallet" : "wallet-outline"} 
+              name={getWalletIcon()} 
               size={20} 
               color={getWalletStatusColor()} 
             />
@@ -161,6 +237,16 @@ export const NavigationHeader = () => {
         )}
       </TouchableOpacity>
 
+      {/* Error Display */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={clearError}>
+            <Ionicons name="close" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Wallet Details Modal */}
       <Modal visible={showWalletModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -172,10 +258,21 @@ export const NavigationHeader = () => {
               </TouchableOpacity>
             </View>
 
+            {/* Network Status */}
+            {!isOnFlowTestnet && (
+              <View style={styles.networkWarning}>
+                <Ionicons name="warning" size={20} color="#ff6b6b" />
+                <Text style={styles.networkWarningText}>Wrong Network</Text>
+                <TouchableOpacity style={styles.switchButton} onPress={handleSwitchNetwork}>
+                  <Text style={styles.switchButtonText}>Switch to Flow Testnet</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.walletInfo}>
               <Text style={[styles.label, { color: colors.text }]}>Username:</Text>
               <Text style={[styles.value, { color: colors.text }]}>
-                {username.username ? `@${username.username}` : 'Not registered'}
+                {username ? `@${username}` : 'Not registered'}
               </Text>
               
               <Text style={[styles.label, { color: colors.text }]}>Address:</Text>
@@ -183,6 +280,11 @@ export const NavigationHeader = () => {
               
               <Text style={[styles.label, { color: colors.text }]}>Balance:</Text>
               <Text style={[styles.value, { color: colors.text }]}>{balance} FLOW</Text>
+
+              <Text style={[styles.label, { color: colors.text }]}>Network:</Text>
+              <Text style={[styles.value, { color: isOnFlowTestnet ? '#28a745' : '#ff6b6b' }]}>
+                {isOnFlowTestnet ? 'Flow EVM Testnet ✓' : 'Wrong Network ⚠️'}
+              </Text>
             </View>
 
             <TouchableOpacity style={styles.actionButton} onPress={handleGetFaucet}>
@@ -207,33 +309,87 @@ export const NavigationHeader = () => {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.description, { color: colors.text }]}>
-              Choose a unique username for your SnapVault account
-            </Text>
-            
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colors.background, 
-                borderColor: colors.text, 
-                color: colors.text 
-              }]}
-              placeholder="Enter username (3-20 characters)"
-              placeholderTextColor={colors.icon}
-              value={usernameInput}
-              onChangeText={setUsernameInput}
-            />
+            {/* Connection Status Check */}
+            {!isConnected ? (
+              <View style={styles.connectionPrompt}>
+                <Text style={[styles.description, { color: colors.text }]}>
+                  Please connect your wallet first
+                </Text>
+                <TouchableOpacity style={styles.connectButton} onPress={handleConnect}>
+                  <Text style={styles.connectButtonText}>Connect Wallet</Text>
+                </TouchableOpacity>
+              </View>
+            ) : !isOnFlowTestnet ? (
+              <View style={styles.connectionPrompt}>
+                <Text style={[styles.description, { color: colors.text }]}>
+                  Please switch to Flow testnet first
+                </Text>
+                <TouchableOpacity style={styles.switchButton} onPress={handleSwitchNetwork}>
+                  <Text style={styles.switchButtonText}>Switch to Flow Testnet</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={[styles.description, { color: colors.text }]}>
+                  Choose a unique username for your SnapVault account
+                </Text>
+                
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={[styles.input, { 
+                      backgroundColor: colors.background, 
+                      borderColor: colors.text, 
+                      color: colors.text 
+                    }]}
+                    placeholder="Enter username (3-20 characters)"
+                    placeholderTextColor={colors.icon}
+                    value={usernameInput}
+                    onChangeText={setUsernameInput}
+                    maxLength={20}
+                    autoCapitalize="none"
+                  />
+                  
+                  {/* Username Availability Indicator */}
+                  <View style={styles.availabilityIndicator}>
+                    {isCheckingUsername ? (
+                      <ActivityIndicator size="small" color={colors.icon} />
+                    ) : usernameAvailable === true ? (
+                      <Ionicons name="checkmark-circle" size={20} color="#28a745" />
+                    ) : usernameAvailable === false ? (
+                      <Ionicons name="close-circle" size={20} color="#ff6b6b" />
+                    ) : null}
+                  </View>
+                </View>
 
-            <TouchableOpacity 
-              style={styles.registerButton} 
-              onPress={handleRegisterUsername} 
-              disabled={username.isLoading}
-            >
-              {username.isLoading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.registerButtonText}>Register Username</Text>
-              )}
-            </TouchableOpacity>
+                {/* Availability Status Text */}
+                {usernameInput.length > 0 && (
+                  <Text style={[styles.availabilityText, {
+                    color: usernameAvailable === true ? '#28a745' : 
+                           usernameAvailable === false ? '#ff6b6b' : colors.icon
+                  }]}>
+                    {isCheckingUsername ? 'Checking availability...' :
+                     usernameAvailable === true ? '✓ Username available!' :
+                     usernameAvailable === false ? '✗ Username already taken' :
+                     usernameInput.length < 3 ? 'Minimum 3 characters required' : ''}
+                  </Text>
+                )}
+
+                <TouchableOpacity 
+                  style={[
+                    styles.registerButton,
+                    { opacity: (usernameAvailable === true && !isLoading) ? 1 : 0.5 }
+                  ]} 
+                  onPress={handleRegisterUsername} 
+                  disabled={isLoading || usernameAvailable !== true}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.registerButtonText}>Register Username</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -271,6 +427,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  errorBanner: {
+    position: 'absolute',
+    top: '100%',
+    left: 20,
+    right: 20,
+    backgroundColor: '#ff6b6b',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 8,
+    zIndex: 1000,
+  },
+  errorText: {
+    color: 'white',
+    fontSize: 14,
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -291,6 +465,32 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  networkWarning: {
+    backgroundColor: '#fff3cd',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  networkWarningText: {
+    color: '#856404',
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+  },
+  switchButton: {
+    backgroundColor: '#ffc107',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  switchButtonText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '600',
   },
   walletInfo: {
     backgroundColor: '#f8f9fa',
@@ -329,16 +529,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  connectionPrompt: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  connectButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    minWidth: 150,
+  },
+  connectButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   description: {
     textAlign: 'center',
     marginBottom: 15,
+    fontSize: 16,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   input: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+  },
+  availabilityIndicator: {
+    position: 'absolute',
+    right: 12,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  availabilityText: {
+    fontSize: 14,
     marginBottom: 15,
+    textAlign: 'center',
   },
   registerButton: {
     backgroundColor: '#007bff',
@@ -351,4 +586,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-}); 
+});

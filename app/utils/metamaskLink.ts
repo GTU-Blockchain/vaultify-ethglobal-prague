@@ -1,4 +1,4 @@
-import { Linking, Platform } from 'react-native';
+import { Linking, Platform, Alert } from 'react-native';
 
 interface MetaMaskLinkConfig {
   scheme: string;
@@ -85,6 +85,105 @@ class MetaMaskLink {
       console.error('Failed to open MetaMask:', error);
       throw error;
     }
+  }
+
+  // 👈 NEW: Open MetaMask for transaction approval
+  async openForTransaction(): Promise<boolean> {
+    try {
+      console.log('Opening MetaMask for transaction approval...');
+      const opened = await this.openMetaMask();
+      
+      if (!opened) {
+        // Show user-friendly message if can't open automatically
+        Alert.alert(
+          'Transaction Approval Required',
+          'Please open MetaMask to approve the transaction',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Open MetaMask', 
+              onPress: () => this.openMetaMask()
+            }
+          ]
+        );
+      }
+      
+      return opened;
+    } catch (error) {
+      console.error('Error opening MetaMask for transaction:', error);
+      
+      // Show alert as fallback
+      Alert.alert(
+        'Open MetaMask',
+        'Please open MetaMask manually to approve the transaction',
+        [
+          { text: 'OK' }
+        ]
+      );
+      
+      return false;
+    }
+  }
+
+  // 👈 NEW: Open MetaMask for network switching
+  async openForNetworkSwitch(): Promise<boolean> {
+    try {
+      console.log('Opening MetaMask for network switch...');
+      const opened = await this.openMetaMask();
+      
+      if (!opened) {
+        // Show user-friendly message if can't open automatically
+        Alert.alert(
+          'Network Switch Required',
+          'Please open MetaMask to approve the network switch to Flow testnet',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Open MetaMask', 
+              onPress: () => this.openMetaMask()
+            }
+          ]
+        );
+      }
+      
+      return opened;
+    } catch (error) {
+      console.error('Error opening MetaMask for network switch:', error);
+      
+      // Show alert as fallback
+      Alert.alert(
+        'Open MetaMask',
+        'Please open MetaMask manually to switch to Flow testnet',
+        [
+          { text: 'OK' }
+        ]
+      );
+      
+      return false;
+    }
+  }
+
+  // 👈 NEW: Show pending approval message with option to open MetaMask
+  showPendingApproval(type: 'transaction' | 'network' | 'signature' = 'transaction'): void {
+    const messages = {
+      transaction: 'Transaction pending approval in MetaMask',
+      network: 'Network switch pending approval in MetaMask',
+      signature: 'Signature pending approval in MetaMask'
+    };
+    
+    const message = messages[type];
+      
+    Alert.alert(
+      'Approval Required',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Open MetaMask', 
+          onPress: () => this.openMetaMask()
+        }
+      ]
+    );
   }
 
   private async checkMetaMaskInstalled(): Promise<boolean> {
