@@ -75,13 +75,12 @@ export default function VaultListScreen() {
       <ScrollView style={styles.scrollView}>
         {vaults.map((vault) => (
           <TouchableOpacity 
-            key={vault.id}
-            style={[
+            key={vault.id}            style={[
               styles.vaultItem, 
               vault.isSent ? styles.sentVault : styles.receivedVault,
               { backgroundColor: colors.tint + '20' }
             ]}
-            onPress={() => console.log('Opening vault:', vault.id)}
+            onPress={() => router.push(`/vault/${vault.id}`)}
           >
             <View style={styles.vaultContent}>
               <Text style={[styles.vaultName, { color: colors.text }]}>{vault.name}</Text>
