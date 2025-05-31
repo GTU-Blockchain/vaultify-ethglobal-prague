@@ -1,18 +1,14 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, useColorScheme, View, ScrollView } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function DashboardScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
-
-  // BottomNavBar yüksekliği sabiti
-  const BOTTOM_NAVBAR_HEIGHT = 70;
 
   // Demo user data
   const user = {
@@ -34,16 +30,15 @@ export default function DashboardScreen() {
       selected: true,
       selectedColor: v.unlocked ? '#A8E6CF' : '#FF8B94',
       selectedTextColor: '#333',
-      // marked ve dotColor kaldırıldı, nokta çıkmasın diye
     };
     return acc;
   }, {} as Record<string, any>);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 8 }]}>  
+    <View style={[styles.container, { backgroundColor: colors.background }]}>  
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
         {/* Dashboard Image */}
-        <View style={styles.imageContainer}>
+        <View style={[styles.imageContainer, { paddingTop: 8 }]}>
           <Image
             source={require('../../assets/images/vault-illustration.png')}
             style={[styles.dashboardImage, { width: '100%', maxWidth: 400, height: 180 }]}
@@ -55,12 +50,20 @@ export default function DashboardScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>Jessica's Dashboard</Text>
         </View>
         {/* Account Info */}
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: colors.text }]}>Wallet</Text>
-          <Text style={[styles.infoValue, { color: colors.text }]}>{user.wallet}</Text>
+        <View style={[styles.infoContainer, { 
+          backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+          borderColor: colors.icon + '20'
+        }]}>
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.text }]}>Wallet</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user.wallet}</Text>
+          </View>
         </View>
         {/* Takvim */}
-        <View style={styles.calendarContainer}>
+        <View style={[styles.calendarContainer, { 
+          backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+          borderColor: colors.icon + '20'
+        }]}>
           <Calendar
             markedDates={markedDates}
             style={{ width: '100%', alignSelf: 'center', minHeight: 320, flexGrow: 1 }}
@@ -86,10 +89,17 @@ export default function DashboardScreen() {
         </View>
         {/* Disconnect Wallet Button */}
         <View style={[styles.disconnectButtonContainerFixed, { marginBottom: insets.bottom + 16 }]}> 
-          <TouchableOpacity style={[styles.disconnectButton, { backgroundColor: colors.tabIconDefault }]}
+          <TouchableOpacity 
+            style={[
+              styles.disconnectButton, 
+              { 
+                backgroundColor: theme === 'dark' ? colors.tint + '20' : '#4A90E2',
+                borderColor: colors.icon + '30'
+              }
+            ]}
             onPress={() => router.push('/dashboard')}
           >  
-            <Text style={[styles.disconnectText, { color: colors.text }]}>Disconnect Wallet</Text>
+            <Text style={[styles.disconnectText, { color: 'white' }]}>Disconnect Wallet</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -101,21 +111,20 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 24,
   },
   headerRow: {
     alignItems: 'center',
     marginBottom: 12,
+    paddingHorizontal: 16,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 16,
   },
   imageContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
     width: '100%',
   },
   dashboardImage: {
@@ -124,10 +133,17 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     height: 180,
   },
+  infoContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
   },
   infoLabel: {
     fontSize: 16,
@@ -137,12 +153,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  
   disconnectButtonContainerFixed: {
     width: '100%',
     alignItems: 'center',
     marginTop: 16,
-    marginBottom: 90, // BottomNavBar'ın üstünde boşluk bırak
+    marginBottom: 90,
   },
   disconnectButton: {
     paddingHorizontal: 24,
@@ -150,6 +165,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     minWidth: 180,
     alignItems: 'center',
+    borderWidth: 1,
   },
   disconnectText: {
     fontWeight: 'bold',
@@ -159,6 +175,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.03)',
+    marginHorizontal: 16,
+    borderWidth: 1,
   },
 });

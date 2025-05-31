@@ -2,10 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { ResizeMode, Video } from 'expo-av';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomNavBar } from '../components/BottomNavBar';
 import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CameraScreen() {
   const colorScheme = useColorScheme();
@@ -25,6 +28,8 @@ export default function CameraScreen() {
   const videoRef = useRef<any>(null);
 
   const longPressTimer = useRef<number | null>(null);
+
+  const { theme } = useTheme();
 
   React.useEffect(() => {
     requestPermission();
@@ -128,13 +133,9 @@ export default function CameraScreen() {
   };
 
   const handleCreateVault = () => {
-    // TODO: Implement vault creation
-    console.log('Creating vault:', { username, amount, description });
+    // TODO: Implement vault creation logic
     setShowVaultModal(false);
-    setMedia(null);
-    setUsername('');
-    setAmount('');
-    setDescription('');
+    router.push('/chat/1');
   };
 
   const toggleCameraType = () => {
@@ -154,7 +155,7 @@ export default function CameraScreen() {
 
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {!media ? (
         <View style={styles.container}>
           <CameraView 
@@ -232,102 +233,100 @@ export default function CameraScreen() {
       )}
 
       <Modal
-        visible={showVaultModal}
         animationType="slide"
         transparent={true}
+        visible={showVaultModal}
+        onRequestClose={() => setShowVaultModal(false)}
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-        >
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { 
+            backgroundColor: theme === 'dark' ? colors.background : '#F0FFF0',
+            borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20',
+            shadowColor: theme === 'dark' ? 'transparent' : '#1B3B4B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 5
+          }]}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity 
-                style={styles.modalCloseButton}
-                onPress={() => setShowVaultModal(false)}
-              >
-                <Ionicons name="close" size={24} color={colors.text} />
+              <Text style={[styles.modalTitle, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Create New Vault</Text>
+              <TouchableOpacity onPress={() => setShowVaultModal(false)}>
+                <Ionicons name="close" size={24} color={theme === 'dark' ? colors.text : '#1B3B4B'} />
               </TouchableOpacity>
-
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Create New Vault</Text>
-              <View style={styles.modalCloseButton} />
             </View>
-            
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Send to @</Text>
 
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                color: colors.text,
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Vault Name</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter vault name"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Unlock Date</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={amount}
+                onChangeText={(text) => {
+                  const regex = /^\d*\.?\d*$/;
+                  if (regex.test(text)) {
+                    setAmount(text);
+                  }
+                }}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Content</Text>
+              <TextInput
+                style={[styles.input, styles.textArea, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Enter your message"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createButton, { 
+                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
+                marginTop: 16,
+                shadowColor: theme === 'dark' ? 'transparent' : '#2E8B57',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 3
               }]}
-
-              placeholder="Enter username"
-
-
-              placeholderTextColor={colors.icon}
-              value={username}
-              onChangeText={setUsername}
-            />
-
-
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Flow Coins Amount</Text>
-
-
-            <TextInput
-              style={[styles.input, { 
-                backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                color: colors.text,
-              }]}
-
-              placeholder="Enter amount (min 0.0001 FLOW)"
-              placeholderTextColor={colors.icon}
-              value={amount}
-              onChangeText={(text) => {
-                const regex = /^\d*\.?\d*$/;
-                if (regex.test(text)) {
-                  setAmount(text);
-                }
-              }}
-              keyboardType="decimal-pad"
-            />
-
-            <Text style={[styles.inputLabel, { color: colors.text }]}>Vault Message</Text>
-
-            <TextInput
-              style={[styles.input, styles.textArea, { 
-                backgroundColor: colorScheme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                color: colors.text,
-              }]}
-
-              placeholder="Add a message to your vault (optional)"
-
-
-
-              placeholderTextColor={colors.icon}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={4}
-            />
-
-            <TouchableOpacity 
-
-              style={[
-                styles.createButton, 
-                { 
-                  backgroundColor: colors.tint,
-                  opacity: (!username || !amount || parseFloat(amount) < 0.0001) ? 0.5 : 1
-                }
-              ]}
               onPress={handleCreateVault}
-              disabled={!username || !amount || parseFloat(amount) < 0.0001}
-
             >
-              <Text style={styles.createButtonText}>Create Vault</Text>
+              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Create Vault</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
+
+      <BottomNavBar />
     </View>
   );
 }
@@ -418,64 +417,56 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 16,
     padding: 20,
-    paddingBottom: 40,
+    borderWidth: 1,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  modalCloseButton: {
-    padding: 8,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    textAlign: 'center',
   },
-
+  inputContainer: {
+    marginBottom: 16,
+  },
   inputLabel: {
     fontSize: 16,
-    fontWeight: '600',
     marginBottom: 8,
-    marginLeft: 4,
+    fontWeight: '500',
   },
   input: {
-    height: 50,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 15,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
-    paddingTop: 15,
   },
   createButton: {
-    height: 50,
-    borderRadius: 10,
-    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    minWidth: 200,
     alignItems: 'center',
-    marginTop: 10,
-
   },
-  createButtonText: {
+  buttonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
+    fontSize: 16,
   },
   errorText: {
     fontSize: 16,
