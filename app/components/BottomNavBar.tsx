@@ -54,6 +54,17 @@ export const BottomNavBar = () => {
           color={isActive('/(tabs)/location') ? colors.tint : colors.icon} 
         />
       </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.navItem}
+        onPress={() => router.push('/(tabs)/dashboard')}
+      >
+        <Ionicons 
+          name="grid-outline" 
+          size={24} 
+          color={isActive('/(tabs)/dashboard') ? colors.tint : colors.icon} 
+        />
+      </TouchableOpacity>
     </View>
   );
 };
