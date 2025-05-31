@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { ResizeMode, Video } from 'expo-av';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { router } from 'expo-router';
-import { useLocalSearchParams } from 'expo-router';
+import * as MediaLibrary from 'expo-media-library';
+import { router, useLocalSearchParams } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
 import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +27,7 @@ export default function CameraScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [hasStartedRecording, setHasStartedRecording] = useState(false);
+  const [isVideoMode, setIsVideoMode] = useState(false);
   const cameraRef = useRef<any>(null);
   const videoRef = useRef<any>(null);
 
@@ -80,18 +82,41 @@ export default function CameraScreen() {
       try {
         setIsRecording(true);
         setHasStartedRecording(true);
-        const video = await cameraRef.current.recordAsync({
+        const recording = await cameraRef.current.recordAsync({
           quality: '720p',
           maxDuration: 60,
           mute: false,
           videoStabilization: false,
           isAudioEnabled: true
         });
-        setMedia({ uri: video.uri, type: 'video' });
+        console.log('Recording completed:', recording);
+        if (recording && recording.uri) {
+          setMedia({ uri: recording.uri, type: 'video' });
+        }
+        setIsRecording(false);
+        setIsLongPressing(false);
+        setHasStartedRecording(false);
       } catch (error) {
-        console.error('Error recording video:', error);
+        console.error('Error during recording:', error);
         Alert.alert('Error', 'Failed to record video. Please try again.');
-      } finally {
+        setIsRecording(false);
+        setIsLongPressing(false);
+        setHasStartedRecording(false);
+      }
+    }
+  };
+
+  const stopRecording = async () => {
+    if (cameraRef.current && isRecording) {
+      try {
+        console.log('Stopping recording...');
+        await cameraRef.current.stopRecording();
+        setIsRecording(false);
+        setIsLongPressing(false);
+        setHasStartedRecording(false);
+      } catch (error) {
+        console.error('Error stopping video:', error);
+        Alert.alert('Error', 'Failed to save video. Please try again.');
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
@@ -100,15 +125,19 @@ export default function CameraScreen() {
   };
 
   const handlePressIn = () => {
-    if (isRecording) {
-      cameraRef.current?.stopRecording();
+    if (isVideoMode) {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
       return;
     }
     
     setIsLongPressing(true);
     longPressTimer.current = setTimeout(() => {
       startRecording();
-    }, 1000); // 1 second delay
+    }, 1000);
   };
 
   const handlePressOut = () => {
@@ -119,9 +148,7 @@ export default function CameraScreen() {
 
     setIsLongPressing(false);
 
-    if (isRecording) {
-      cameraRef.current?.stopRecording();
-    } else {
+    if (!isVideoMode && !isRecording) {
       takePhoto();
     }
   };
@@ -135,13 +162,36 @@ export default function CameraScreen() {
   };
 
   const handleCreateVault = () => {
-    // TODO: Implement vault creation logic
     setShowVaultModal(false);
     router.push('/chat/1');
   };
 
   const toggleCameraType = () => {
     setCameraType(current => current === 'back' ? 'front' : 'back');
+  };
+
+  const handleSavePhoto = async () => {
+    if (!media) return;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please grant media library permissions to save photos.');
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(media.uri);
+      Alert.alert('Saved', 'Photo saved to your camera roll!');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save photo.');
+    }
+  };
+
+  const handleSharePhoto = async () => {
+    if (!media) return;
+    try {
+      await Sharing.shareAsync(media.uri);
+    } catch (e) {
+      Alert.alert('Error', 'Could not share photo.');
+    }
   };
 
   if (!permission) {
@@ -190,17 +240,76 @@ export default function CameraScreen() {
                 styles.captureButtonInner,
                 isRecording && styles.recordingButtonInner
               ]} />
+              
             </TouchableOpacity>
+            <View style={styles.modeIndicator}>
+              <TouchableOpacity 
+                onPress={() => setIsVideoMode(false)}
+                style={styles.modeButton}
+              >
+                <Text style={[
+                  styles.modeText, 
+                  { 
+                    color: colors.text,
+                    fontWeight: !isVideoMode ? '600' : '400',
+                    textShadowColor: theme === 'dark' ? '#000' : '#fff',
+                    textShadowOffset: { width: 0.5, height: 0.5 },
+                    textShadowRadius: 1,
+                  }
+                ]}>Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setIsVideoMode(true)}
+                style={styles.modeButton}
+              >
+                <Text style={[
+                  styles.modeText, 
+                  { 
+                    color: colors.text,
+                    fontWeight: isVideoMode ? '600' : '400',
+                    textShadowColor: theme === 'dark' ? '#000' : '#fff',
+                    textShadowOffset: { width: 0.5, height: 0.5 },
+                    textShadowRadius: 1,
+                  }
+                ]}>Video</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       ) : (
         <View style={styles.previewContainer}>
           {media.type === 'photo' ? (
-            <Image 
-              source={{ uri: media.uri }} 
-              style={styles.preview}
-              resizeMode="contain"
-            />
+            <>
+              <Image 
+                source={{ uri: media.uri }} 
+                style={styles.preview}
+                resizeMode="contain"
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 16 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.tint,
+                    padding: 12,
+                    borderRadius: 8,
+                    marginHorizontal: 8,
+                  }}
+                  onPress={handleSavePhoto}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Save to Device</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.tint,
+                    padding: 12,
+                    borderRadius: 8,
+                    marginHorizontal: 8,
+                  }}
+                  onPress={handleSharePhoto}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           ) : (
             <View style={styles.videoContainer}>
               <Video
@@ -210,13 +319,25 @@ export default function CameraScreen() {
                 useNativeControls
                 resizeMode={ResizeMode.CONTAIN}
                 isLooping
-                shouldPlay
+                shouldPlay={false}
                 isMuted={false}
                 onError={(error: string) => {
                   console.error('Video Error:', error);
                   Alert.alert('Error', 'Failed to play video. Please try again.');
                 }}
               />
+              <View style={styles.videoControls}>
+                <TouchableOpacity 
+                  style={[styles.playButton, { backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57' }]}
+                  onPress={() => {
+                    if (videoRef.current) {
+                      videoRef.current.playAsync();
+                    }
+                  }}
+                >
+                  <Ionicons name="play" size={24} color="white" />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           <TouchableOpacity 
@@ -475,5 +596,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-});
-
+  modeIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 24,
+  },
+  modeButton: {
+    padding: 8,
+  },
+  modeText: {
+    fontSize: 16,
+  },
+  videoControls: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+}); 

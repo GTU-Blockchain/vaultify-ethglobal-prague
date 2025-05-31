@@ -50,7 +50,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Vaultify to use your location."
         }
-      ]
+      ],
+      "react-native-video"
     ],
     "experiments": {
       "typedRoutes": true
