@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet, useColorScheme, View } from 'react-native';
