@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';
@@ -24,15 +24,77 @@ export default function DashboardScreen() {
     { date: '2025-06-07', unlocked: true },
   ];
 
+  // Aylar ve yıllar
+  const monthNames = [
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  ];
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [showArchiveCalendar, setShowArchiveCalendar] = useState(false);
+
+  // Yıl aralığı (örnek: son 3 yıl)
+  const yearRange = Array.from({ length: 3 }, (_, i) => today.getFullYear() - i).reverse();
+
   // Takvimde işaretlenecek günler (açık: pastel yeşil, kapalı: pastel kırmızı)
   const markedDates = vaults.reduce((acc, v) => {
     acc[v.date] = {
       selected: true,
-      selectedColor: v.unlocked ? '#A8E6CF' : '#FF8B94',
-      selectedTextColor: '#333',
+      selectedColor: theme === 'dark' ? '#A8E6CF' : '#4A90E2',
+      selectedTextColor: theme === 'dark' ? '#333' : '#fff',
     };
     return acc;
   }, {} as Record<string, any>);
+
+  // Seçili ay ve yıl için takvim başlangıcı
+  const calendarMonth = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
+
+  // Ay başlığına tıklayınca modal açılır
+  const handleMonthTitlePress = () => setShowArchiveCalendar(true);
+
+  // Modal kapatılır ve ay seçilirse ana takvim güncellenir
+  const handleSelectMonth = (year: number, month: number) => {
+    setSelectedYear(year);
+    setSelectedMonth(month);
+    setShowArchiveCalendar(false);
+  };
+
+  // Takvim günlerini oluştur (hafta başı Pazartesi)
+  function getMonthMatrix(year: number, month: number) {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const matrix = [];
+    let week = [];
+    let dayOfWeek = (firstDay.getDay() + 6) % 7; // Pazartesi=0
+    for (let i = 0; i < dayOfWeek; i++) week.push(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      week.push(d);
+      if (week.length === 7) {
+        matrix.push(week);
+        week = [];
+      }
+    }
+    if (week.length > 0) {
+      while (week.length < 7) week.push(null);
+      matrix.push(week);
+    }
+    return matrix;
+  }
+
+  // Vault günlerini ay bazında gruplama
+  function getVaultDaysByMonth(year: number, month: number) {
+    // vaults dizisindeki ilgili yıl ve ayda olan günleri döndür
+    return vaults
+      .filter(v => {
+        const d = new Date(v.date);
+        return d.getFullYear() === year && d.getMonth() === month;
+      })
+      .map(v => ({
+        day: new Date(v.date).getDate(),
+        unlocked: v.unlocked
+      }));
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>  
@@ -63,16 +125,25 @@ export default function DashboardScreen() {
         <View style={[styles.calendarContainer, { 
           backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
           borderColor: colors.icon + '20'
-        }]}>
+        }]}>  
+          {/* Takvim başlığı */}
+          <TouchableWithoutFeedback onPress={handleMonthTitlePress}>
+            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+                {monthNames[selectedMonth]} {selectedYear}
+              </Text>
+            </View>
+          </TouchableWithoutFeedback>
           <Calendar
+            current={calendarMonth}
             markedDates={markedDates}
             style={{ width: '100%', alignSelf: 'center', minHeight: 320, flexGrow: 1 }}
             theme={{
               backgroundColor: colors.background,
               calendarBackground: colors.background,
               textSectionTitleColor: colors.text,
-              selectedDayBackgroundColor: '#A8E6CF',
-              selectedDayTextColor: '#333',
+              selectedDayBackgroundColor: theme === 'dark' ? '#A8E6CF' : '#4A90E2',
+              selectedDayTextColor: theme === 'dark' ? '#333' : '#fff',
               todayTextColor: colors.tint,
               dayTextColor: colors.text,
               textDisabledColor: '#d9e1e8',
@@ -85,8 +156,93 @@ export default function DashboardScreen() {
               textDayStyle: { textAlign: 'center', alignSelf: 'center', justifyContent: 'center', marginTop: 2 },
               selectedDotColor: 'transparent',
             }}
+            onMonthChange={date => {
+              setSelectedMonth(date.month - 1);
+              setSelectedYear(date.year);
+            }}
+            hideExtraDays={false}
+            enableSwipeMonths={true}
           />
         </View>
+        {/* Instagram arşiv takvimi modalı */}
+        <Modal
+          visible={showArchiveCalendar}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setShowArchiveCalendar(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={{ flex: 1, paddingTop: insets.top }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, marginBottom: 8 }}>
+                <TouchableOpacity onPress={() => setShowArchiveCalendar(false)} style={{ padding: 8 }}>
+                  <Text style={{ color: colors.text, fontSize: 24 }}>×</Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={yearRange.flatMap(year => monthNames.map((m, idx) => ({ year, month: idx, name: m })))}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+                showsVerticalScrollIndicator={false}
+                initialScrollIndex={yearRange.findIndex(y => y === selectedYear) * 12 + selectedMonth}
+                getItemLayout={(_, index) => ({ length: 300, offset: 300 * index, index })}
+                keyExtractor={item => `${item.year}-${item.month}`}
+                renderItem={({ item }) => {
+                  const vaultDays = getVaultDaysByMonth(item.year, item.month);
+                  const matrix = getMonthMatrix(item.year, item.month);
+
+                  return (
+                    <View style={{ 
+                      paddingVertical: 16, 
+                      backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                      marginHorizontal: 16, 
+                      marginBottom: 16, 
+                      borderRadius: 12,
+                      borderWidth: (item.year === selectedYear && item.month === selectedMonth) ? 1 : 0,
+                      borderColor: colors.tint,
+                    }}>
+                      <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 20, textAlign: 'center', marginBottom: 8 }}>{item.name} {item.year}</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4, paddingHorizontal: 12 }}>
+                        {['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map(gun => (
+                          <Text key={gun} style={{ color: colors.tabIconDefault, width: 32, textAlign: 'center', fontWeight: 'bold' }}>{gun}</Text>
+                        ))}
+                      </View>
+                      {matrix.map((week, wIdx) => (
+                        <View key={wIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 2 }}>
+                          {week.map((day, dIdx) => {
+                            const vault = day ? vaultDays.find(v => v.day === day) : null;
+                            return (
+                              <TouchableOpacity
+                                key={dIdx}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: 16,
+                                  backgroundColor: vault
+                                    ? (vault.unlocked ? '#A8E6CF' : '#FF8B94')
+                                    : 'transparent',
+                                }}
+                                disabled={!vault}
+                                onPress={() => vault && handleSelectMonth(item.year, item.month)}
+                              >
+                                {day && <Text style={{ 
+                                  color: vault ? '#222' : colors.text, 
+                                  fontWeight: vault ? 'bold' : 'normal',
+                                  opacity: vault ? 1 : 0.5 
+                                }}>{day}</Text>}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ))}
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
         {/* Disconnect Wallet Button */}
         <View style={[styles.disconnectButtonContainerFixed, { marginBottom: insets.bottom + 16 }]}> 
           <TouchableOpacity 
