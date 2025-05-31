@@ -18,7 +18,7 @@ export const BottomNavBar = () => {
       styles.container, 
       { 
         backgroundColor: colors.background,
-        paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
+        paddingBottom: Platform.OS === 'ios' ? insets.bottom : 30,
         borderTopColor: colors.icon,
       }
     ]}>

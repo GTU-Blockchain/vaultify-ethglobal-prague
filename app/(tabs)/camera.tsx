@@ -6,20 +6,18 @@ import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
-import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';
-import { Colors } from '../constants/Colors';
 import { useTheme } from '../context/ThemeContext';
 
-export default function CameraScreen() {
-  const { username: routeUsername } = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+export default function CameraScreen() {  const { username: routeUsername } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [media, setMedia] = useState<{ uri: string; type: 'photo' | 'video' } | null>(null);
   const [showVaultModal, setShowVaultModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [username, setUsername] = useState(routeUsername ? String(routeUsername) : '');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -50,6 +48,14 @@ export default function CameraScreen() {
     }
   }, [media]);
 
+  const handleError = (message: string) => {
+    Alert.alert(
+      'Error',
+      message,
+      [{ text: 'OK', onPress: () => {} }]
+    );
+  };
+
   const takePhoto = async () => {
     if (cameraRef.current) {
       try {
@@ -72,7 +78,7 @@ export default function CameraScreen() {
         }
       } catch (error) {
         console.error('Error taking photo:', error);
-        Alert.alert('Error', 'Failed to take photo. Please try again.');
+        handleError('Failed to take photo. Please try again.');
       }
     }
   };
@@ -98,7 +104,7 @@ export default function CameraScreen() {
         setHasStartedRecording(false);
       } catch (error) {
         console.error('Error during recording:', error);
-        Alert.alert('Error', 'Failed to record video. Please try again.');
+        handleError('Failed to record video. Please try again.');
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
@@ -116,7 +122,7 @@ export default function CameraScreen() {
         setHasStartedRecording(false);
       } catch (error) {
         console.error('Error stopping video:', error);
-        Alert.alert('Error', 'Failed to save video. Please try again.');
+        handleError('Failed to save video. Please try again.');
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
@@ -163,7 +169,8 @@ export default function CameraScreen() {
 
   const handleCreateVault = () => {
     setShowVaultModal(false);
-    router.push('/chat/1');
+    setShowConfirmationModal(true);
+    // Further vault creation logic here
   };
 
   const toggleCameraType = () => {
@@ -219,12 +226,12 @@ export default function CameraScreen() {
           />
           <TouchableOpacity 
             style={[styles.flipButton, { 
-              top: insets.top + 5,
+            top: 16 ,
               right: 16
             }]}
             onPress={toggleCameraType}
           >
-            <Ionicons name="camera-reverse" size={24} color={colors.text} />
+            <Ionicons name="camera-reverse" size={24} color={colors.icon} />
           </TouchableOpacity>
           <View style={styles.cameraControls}>
             <TouchableOpacity 
@@ -250,7 +257,7 @@ export default function CameraScreen() {
                 <Text style={[
                   styles.modeText, 
                   { 
-                    color: colors.text,
+                  
                     fontWeight: !isVideoMode ? '600' : '400',
                     textShadowColor: theme === 'dark' ? '#000' : '#fff',
                     textShadowOffset: { width: 0.5, height: 0.5 },
@@ -265,7 +272,7 @@ export default function CameraScreen() {
                 <Text style={[
                   styles.modeText, 
                   { 
-                    color: colors.text,
+                    
                     fontWeight: isVideoMode ? '600' : '400',
                     textShadowColor: theme === 'dark' ? '#000' : '#fff',
                     textShadowOffset: { width: 0.5, height: 0.5 },
@@ -285,8 +292,7 @@ export default function CameraScreen() {
                 style={styles.preview}
                 resizeMode="contain"
               />
-              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 16 }}>
-                <TouchableOpacity
+              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 16 }}>                <TouchableOpacity
                   style={{
                     backgroundColor: colors.tint,
                     padding: 12,
@@ -295,7 +301,7 @@ export default function CameraScreen() {
                   }}
                   onPress={handleSavePhoto}
                 >
-                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Save to Device</Text>
+                  <Text style={styles.buttonText}>Save to Device</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{
@@ -306,7 +312,7 @@ export default function CameraScreen() {
                   }}
                   onPress={handleSharePhoto}
                 >
-                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Share</Text>
+                  <Text style={styles.buttonText}>Share</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -321,9 +327,15 @@ export default function CameraScreen() {
                 isLooping
                 shouldPlay={false}
                 isMuted={false}
-                onError={(error: string) => {
+                onError={(error) => {
                   console.error('Video Error:', error);
-                  Alert.alert('Error', 'Failed to play video. Please try again.');
+                  Alert.alert(
+                    'Video Error',
+                    'Failed to play video. Please try again.',
+                    [
+                      { text: 'OK', onPress: () => {} }
+                    ]
+                  );
                 }}
               />
               <View style={styles.videoControls}>
@@ -341,16 +353,16 @@ export default function CameraScreen() {
             </View>
           )}
           <TouchableOpacity 
-            style={[styles.backButton, { top: insets.top + 10 }]}
+            style={[styles.backButton, { top: 16 }]}
             onPress={handleCancel}
           >
-            <Ionicons name="close" size={24} color={colors.text} />
+            <Ionicons name="close" size={24} color={colors.icon} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.sendButton}
             onPress={handleSend}
           >
-            <Ionicons name="paper-plane" size={24} color={colors.text} />
+            <Ionicons name="paper-plane" size={24} color={colors.icon} />
           </TouchableOpacity>
         </View>
       )}
@@ -372,7 +384,15 @@ export default function CameraScreen() {
             elevation: 5
           }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Create New Vault</Text>
+              <Text 
+                style={[styles.modalTitle, { 
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  textAlign: 'center'
+                }]}
+                numberOfLines={2}
+              >
+                Create New Vault
+              </Text>
               <TouchableOpacity onPress={() => setShowVaultModal(false)}>
                 <Ionicons name="close" size={24} color={theme === 'dark' ? colors.text : '#1B3B4B'} />
               </TouchableOpacity>
@@ -433,17 +453,79 @@ export default function CameraScreen() {
 
             <TouchableOpacity
               style={[styles.createButton, { 
-                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
-                marginTop: 16,
-                shadowColor: theme === 'dark' ? 'transparent' : '#2E8B57',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 3
+                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57'
               }]}
               onPress={handleCreateVault}
             >
-              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Create Vault</Text>
+              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
+                Create Vault
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showConfirmationModal}
+        onRequestClose={() => setShowConfirmationModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { 
+            backgroundColor: theme === 'dark' ? colors.background : '#F0FFF0',
+            borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20',
+            shadowColor: theme === 'dark' ? 'transparent' : '#1B3B4B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 5
+          }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                <View style={[styles.checkmarkContainer, { backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57' }]}>
+                  <Ionicons name="checkmark" size={32} color="white" />
+                </View>
+                <Text style={[styles.modalTitle, { color: theme === 'dark' ? colors.text : '#1B3B4B', marginTop: 16 }]}>
+                  Vault Created!
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Vault Name
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {username}
+              </Text>
+
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Unlock Date
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {amount}
+              </Text>
+
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Content
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {description}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createButton, { 
+                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
+                marginTop: 16
+              }]}
+              onPress={() => {
+                setShowConfirmationModal(false);
+                router.push('/chat/1');
+              }}
+            >
+              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -482,6 +564,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+   
   },
   captureButton: {
     width: 70,
@@ -527,16 +610,36 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    left: 20,
-    padding: 10,
+    left: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 25,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   sendButton: {
     position: 'absolute',
-    right: 20,
+    right: 16,
     bottom: 100,
-    padding: 10,
+    padding: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 25,
+     zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   modalContainer: {
     flex: 1,
@@ -557,9 +660,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  modalTitleContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  checkmarkContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   inputContainer: {
     marginBottom: 16,
@@ -607,6 +722,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   modeText: {
+    color: 'white',
     fontSize: 16,
   },
   videoControls: {
@@ -633,4 +749,17 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-}); 
+  modalBody: {
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  modalValue: {
+    fontSize: 16,
+    fontWeight: '400',
+  },
+});
