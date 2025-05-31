@@ -194,32 +194,41 @@ export default function DashboardScreen() {
           {/* Takvim başlığı */}
           <TouchableWithoutFeedback onPress={handleMonthTitlePress}>
             <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}> 
                 {monthNames[selectedMonth]} {selectedYear}
               </Text>
             </View>
-          </TouchableWithoutFeedback>
-          <Calendar
+          </TouchableWithoutFeedback>          <Calendar
             current={calendarMonth}
             markedDates={markedDates}
-            style={{ width: '100%', alignSelf: 'center', minHeight: 320, flexGrow: 1 }}
+            style={{ 
+              width: '100%', 
+              alignSelf: 'center', 
+              minHeight: 320, 
+              flexGrow: 1,
+              backgroundColor: 'transparent'
+            }}
             theme={{
-              backgroundColor: colors.background,
-              calendarBackground: colors.background,
+              backgroundColor: 'transparent',
+              calendarBackground: 'transparent',
               textSectionTitleColor: colors.text,
               selectedDayBackgroundColor: theme === 'dark' ? '#A8E6CF' : '#4A90E2',
               selectedDayTextColor: theme === 'dark' ? '#333' : '#fff',
               todayTextColor: colors.tint,
               dayTextColor: colors.text,
-              textDisabledColor: '#d9e1e8',
+              textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
               dotColor: 'transparent',
-              arrowColor: colors.tint,
+              arrowColor: colors.text,
               monthTextColor: colors.text,
               indicatorColor: colors.tint,
               textDayFontWeight: 'bold',
               textDayFontSize: 18,
-              textDayStyle: { textAlign: 'center', alignSelf: 'center', justifyContent: 'center', marginTop: 2 },
-              selectedDotColor: 'transparent'
+              textMonthFontSize: 18,
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontSize: 14,
+              textDayHeaderFontWeight: '600',
+              
+              
             }}
             dayComponent={({ date, state, marking }) => (
               <CalendarDay
@@ -227,7 +236,7 @@ export default function DashboardScreen() {
                 state={state}
                 marking={marking}
                 theme={{
-                  textDisabledColor: '#d9e1e8',
+                  textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
                   todayTextColor: colors.tint,
                   dayTextColor: colors.text,
                   textDayFontSize: 18
