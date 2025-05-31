@@ -10,6 +10,7 @@ class WalletConnectService {
   private chainId: number | null = null;
   private isConnected: boolean = false;
   private initializationPromise: Promise<SignClient> | null = null;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   // State change listeners
   private stateChangeListeners: ((state: any) => void)[] = [];
@@ -23,9 +24,7 @@ class WalletConnectService {
   removeStateChangeListener(listener: (state: any) => void) {
     this.stateChangeListeners = this.stateChangeListeners.filter(l => l !== listener);
   }
-
   // Notify state change (debounced to prevent spam)
-  private debounceTimer: NodeJS.Timeout | null = null;
   private notifyStateChange() {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
