@@ -555,6 +555,7 @@ class WalletConnectService {
     const provider = new ethers.JsonRpcProvider('https://testnet.evm.nodes.onflow.org');
 
     return {
+      provider, // Add provider property for ContractRunner interface
       getAddress: () => Promise.resolve(this.address!),
       sendTransaction: async (transaction: any) => {
         // Prepare transaction

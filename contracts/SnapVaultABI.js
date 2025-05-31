@@ -1,4 +1,4 @@
-[
+const SnapVaultABI = [
 	{
 		"inputs": [
 			{
@@ -485,4 +485,6 @@
 		"stateMutability": "view",
 		"type": "function"
 	}
-]
+];
+
+module.exports = SnapVaultABI;
