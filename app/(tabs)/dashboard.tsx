@@ -9,7 +9,6 @@ import { useTheme } from '../context/ThemeContext';
 export default function DashboardScreen() {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
-
   // Demo user data
   const user = {
     username: 'jessica.w',
@@ -17,17 +16,16 @@ export default function DashboardScreen() {
     wallet: '0xA1b2...C3d4',
   };
 
-  // Mock vault data (sonra blockchain'den alınacak)
+  // Mock vault data (will be fetched from blockchain later)
   const vaults = [
     { date: '2025-06-01', unlocked: true },
     { date: '2025-06-03', unlocked: false },
     { date: '2025-06-07', unlocked: true },
   ];
-
-  // Aylar ve yıllar
+  // Months and years
   const monthNames = [
-    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
@@ -59,14 +57,13 @@ export default function DashboardScreen() {
     setSelectedMonth(month);
     setShowArchiveCalendar(false);
   };
-
-  // Takvim günlerini oluştur (hafta başı Pazartesi)
+  // Create calendar days (week starts on Monday)
   function getMonthMatrix(year: number, month: number) {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const matrix = [];
     let week = [];
-    let dayOfWeek = (firstDay.getDay() + 6) % 7; // Pazartesi=0
+    let dayOfWeek = (firstDay.getDay() + 6) % 7; // Monday=0
     for (let i = 0; i < dayOfWeek; i++) week.push(null);
     for (let d = 1; d <= lastDay.getDate(); d++) {
       week.push(d);
@@ -81,10 +78,9 @@ export default function DashboardScreen() {
     }
     return matrix;
   }
-
-  // Vault günlerini ay bazında gruplama
+  // Group vault days by month
   function getVaultDaysByMonth(year: number, month: number) {
-    // vaults dizisindeki ilgili yıl ve ayda olan günleri döndür
+    // Return the days in the given year and month from the vaults array
     return vaults
       .filter(v => {
         const d = new Date(v.date);
@@ -202,8 +198,8 @@ export default function DashboardScreen() {
                     }}>
                       <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 20, textAlign: 'center', marginBottom: 8 }}>{item.name} {item.year}</Text>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4, paddingHorizontal: 12 }}>
-                        {['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map(gun => (
-                          <Text key={gun} style={{ color: colors.tabIconDefault, width: 32, textAlign: 'center', fontWeight: 'bold' }}>{gun}</Text>
+                        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => (
+                          <Text key={day} style={{ color: colors.tabIconDefault, width: 32, textAlign: 'center', fontWeight: 'bold' }}>{day}</Text>
                         ))}
                       </View>
                       {matrix.map((week, wIdx) => (
