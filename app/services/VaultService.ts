@@ -271,6 +271,29 @@ class VaultService {
   }
 
   /**
+   * Get username for any wallet address
+   */
+  async getUsernameByAddress(address: string): Promise<string | null> {
+    try {
+      const contract = await this.getContract();
+      
+      if (!address) {
+        return null;
+      }
+
+      console.log('🔍 Looking up username for address:', address);
+      const username = await contract.getUsernameByAddress(address);
+      console.log('📋 Username lookup result:', username);
+      
+      return username || null;
+
+    } catch (error) {
+      console.error('Error getting username by address:', error);
+      return null;
+    }
+  }
+
+  /**
    * Check if username is available
    */
   async isUsernameAvailable(username: string): Promise<boolean> {
