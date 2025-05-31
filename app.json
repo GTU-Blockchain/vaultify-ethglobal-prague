@@ -13,8 +13,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.snapvault.app",
-      "bundleIdentifier": "com.vaultify.ethglobalprague",
+      "bundleIdentifier": "com.vaultify.app",
+   
       "config": {
         "googleMapsApiKey": "YOUR_IOS_API_KEY"
       }
@@ -24,8 +24,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.snapvault.app",
-      "package": "com.vaultify.ethglobalprague",
+      "package": "com.vaultify.app",
+  
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_ANDROID_API_KEY"

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Video } from 'expo-av';
-import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
+import { ResizeMode, Video } from 'expo-av';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,15 +8,8 @@ import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
 import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { useWalletConnect } from '../../hooks/useWalletConnect';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { Colors } from '../constants/Colors';
-
-interface MediaState {
-  uri: string;
-  type: 'photo' | 'video';
-}
 import { useTheme } from '../context/ThemeContext';
 
 export default function CameraScreen() {
@@ -25,60 +18,37 @@ export default function CameraScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  
-  // Wallet hook
-  const { 
-    isConnected, 
-    address, 
-    balance, 
-    isLoading: isWalletLoading,
-    error: walletError,
-    connect,
-    disconnect
-  } = useWalletConnect();
-  
-  // UI states
-  const [media, setMedia] = useState<MediaState | null>(null);
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [cameraType, setCameraType] = useState<CameraType>('back');
+  const [media, setMedia] = useState<{ uri: string; type: 'photo' | 'video' } | null>(null);
+  const [showVaultModal, setShowVaultModal] = useState(false);
+  const [username, setUsername] = useState(routeUsername ? String(routeUsername) : '');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [cameraType, setCameraType] = useState<'front' | 'back'>('back');
   const [isRecording, setIsRecording] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [hasStartedRecording, setHasStartedRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  
-  // Form states
-  const [usernameInput, setUsernameInput] = useState('');
-  
   const [isVideoMode, setIsVideoMode] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
-  const videoRef = useRef<Video>(null);
+  const cameraRef = useRef<any>(null);
+  const videoRef = useRef<any>(null);
 
   const longPressTimer = useRef<number | null>(null);
 
   const { theme } = useTheme();
-  const recordingTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const handleWalletConnect = () => {
-    setShowWalletModal(true);
-  };
-
-  const handleRegisterUsername = async () => {
-    if (!usernameInput.trim()) {
-      Alert.alert('Error', 'Please enter a username');
-      return;
+  React.useEffect(() => {
+    requestPermission();
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
+  
+  React.useEffect(() => {
+    if (media?.type === 'video') {
+      setIsRecording(false);
     }
-
-    try {
-      // TODO: Implement username registration
-      setUsernameInput('');
-      setShowUsernameModal(false);
-      Alert.alert('✅ Success', 'Username registered successfully!');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      Alert.alert('Error', errorMessage);
-    }
-  };
+  }, [media]);
 
   const takePhoto = async () => {
     if (cameraRef.current) {
@@ -100,9 +70,8 @@ export default function CameraScreen() {
         } else {
           setMedia({ uri: photo.uri, type: 'photo' });
         }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error('Error taking photo:', errorMessage);
+      } catch (error) {
+        console.error('Error taking photo:', error);
         Alert.alert('Error', 'Failed to take photo. Please try again.');
       }
     }
@@ -113,48 +82,26 @@ export default function CameraScreen() {
       try {
         setIsRecording(true);
         setHasStartedRecording(true);
-        setRecordingTime(0);
-        
-        // Start recording timer
-        recordingTimer.current = setInterval(() => {
-          setRecordingTime(prev => prev + 1);
-        }, 1000);
-
         const recording = await cameraRef.current.recordAsync({
-          maxDuration: 60
+          quality: '720p',
+          maxDuration: 60,
+          mute: false,
+          videoStabilization: false,
+          isAudioEnabled: true
         });
-        
-        if (video) {
-          console.log('Recording completed:', recording);
+        console.log('Recording completed:', recording);
         if (recording && recording.uri) {
           setMedia({ uri: recording.uri, type: 'video' });
-        }
         }
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error('Error during recording:', errorMessage);
+      } catch (error) {
+        console.error('Error during recording:', error);
         Alert.alert('Error', 'Failed to record video. Please try again.');
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
-        setRecordingTime(0);
-        if (recordingTimer.current) {
-          clearInterval(recordingTimer.current);
-        }
-      }
-    }
-  };
-
-  const stopRecording = async () => {
-    if (cameraRef.current && isRecording) {
-      try {
-        await cameraRef.current.stopRecording();
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error('Error stopping recording:', errorMessage);
       }
     }
   };
@@ -173,21 +120,6 @@ export default function CameraScreen() {
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
-        setRecordingTime(0);
-        if (recordingTimer.current) {
-          clearInterval(recordingTimer.current);
-        }
-      }
-    }
-  };
-
-  const stopRecording = async () => {
-    if (cameraRef.current && isRecording) {
-      try {
-        await cameraRef.current.stopRecording();
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        console.error('Error stopping recording:', errorMessage);
       }
     }
   };
@@ -218,11 +150,15 @@ export default function CameraScreen() {
 
     if (!isVideoMode && !isRecording) {
       takePhoto();
-    } else if (isRecording) {
-      stopRecording();
     }
-    
-    setIsLongPressing(false);
+  };
+
+  const handleSend = () => {
+    setShowVaultModal(true);
+  };
+
+  const handleCancel = () => {
+    setMedia(null);
   };
 
   const handleCreateVault = () => {
@@ -274,27 +210,35 @@ export default function CameraScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {!media ? (
         <View style={styles.container}>
-          <CameraView ref={cameraRef} style={styles.camera} facing={cameraType} />
-          
+          <CameraView 
+            ref={cameraRef}
+            style={styles.camera} 
+            facing={cameraType}
+            enableTorch={false}
+            active={true}
+          />
           <TouchableOpacity 
-            style={[styles.flipButton, { top: insets.top + 120, right: 20 }]}
-            onPress={() => setCameraType(current => current === 'back' ? 'front' : 'back')}
+            style={[styles.flipButton, { 
+              top: insets.top + 5,
+              right: 16
+            }]}
+            onPress={toggleCameraType}
           >
-            <Ionicons name="camera-reverse" size={24} color="white" />
+            <Ionicons name="camera-reverse" size={24} color={colors.text} />
           </TouchableOpacity>
-          
           <View style={styles.cameraControls}>
             <TouchableOpacity 
               style={[
                 styles.captureButton,
                 isRecording && styles.recordingButton
-              ]} 
+              ]}
               onPressIn={handlePressIn}
               onPressOut={handlePressOut}
+              delayLongPress={1000}
             >
               <View style={[
-                styles.captureInner,
-                isRecording && styles.recordingInner
+                styles.captureButtonInner,
+                isRecording && styles.recordingButtonInner
               ]} />
               
             </TouchableOpacity>
@@ -397,10 +341,16 @@ export default function CameraScreen() {
             </View>
           )}
           <TouchableOpacity 
-            style={[styles.actionButton, { top: insets.top + 20, left: 20 }]}
-            onPress={() => setMedia(null)}
+            style={[styles.backButton, { top: insets.top + 10 }]}
+            onPress={handleCancel}
           >
-            <Ionicons name="close" size={24} color="white" />
+            <Ionicons name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.sendButton}
+            onPress={handleSend}
+          >
+            <Ionicons name="paper-plane" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
       )}
@@ -505,48 +455,77 @@ export default function CameraScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  centerContent: { justifyContent: 'center', alignItems: 'center' },
-  camera: { flex: 1 },
-  statusBar: { position: 'absolute', left: 16, right: 16, zIndex: 10 },
-  walletButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, alignItems: 'center' },
-  walletButtonText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
-  flipButton: { position: 'absolute', padding: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 25 },
-  cameraControls: { position: 'absolute', bottom: 100, left: 0, right: 0, alignItems: 'center' },
-  captureButton: { width: 70, height: 70, borderRadius: 35, backgroundColor: 'rgba(255,255,255,0.3)', justifyContent: 'center', alignItems: 'center' },
-  captureInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: 'white' },
-  previewContainer: { flex: 1, backgroundColor: 'black' },
-  preview: { flex: 1 },
-  actionButton: { position: 'absolute', padding: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 25 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  modalContent: { gap: 15 },
-  primaryButton: { backgroundColor: '#007bff', padding: 15, borderRadius: 10, alignItems: 'center' },
-  secondaryButton: { backgroundColor: '#6c757d', padding: 15, borderRadius: 10, alignItems: 'center' },
-  outlineButton: { borderWidth: 2, borderColor: '#007bff', padding: 15, borderRadius: 10, alignItems: 'center' },
-  dangerButton: { backgroundColor: '#dc3545', padding: 15, borderRadius: 10, alignItems: 'center' },
-  buttonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  secondaryButtonText: { color: 'white', fontSize: 16 },
-  outlineButtonText: { color: '#007bff', fontSize: 16 },
-  inputContainer: { gap: 10 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16 },
-  walletInfo: { backgroundColor: '#f8f9fa', padding: 15, borderRadius: 10, gap: 5 },
-  label: { fontWeight: 'bold' },
-  value: { fontFamily: 'monospace', marginBottom: 10 },
-  description: { textAlign: 'center', marginBottom: 15 },
-  errorText: { textAlign: 'center', fontSize: 14 },
-  text: { fontSize: 18, textAlign: 'center', marginBottom: 20 },
-  button: { backgroundColor: '#007bff', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8 },
-  balanceText: { color: 'white', fontSize: 14, fontWeight: 'bold' },
+  container: {
+    flex: 1,
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraControls: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  flipButton: {
+    position: 'absolute',
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 25,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  captureButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'white',
+  },
   recordingButton: {
-    backgroundColor: 'rgba(255,0,0,0.3)',
+    backgroundColor: 'rgba(255, 0, 0, 0.3)',
   },
-  recordingInner: {
+  recordingButtonInner: {
     backgroundColor: 'red',
+    borderRadius: 5,
+    width: 30,
+    height: 30,
   },
-  recordingIndicator: {
+  previewContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  preview: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  videoContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'black',
+  },
+  backButton: {
     position: 'absolute',
     left: 20,
     padding: 10,
@@ -654,4 +633,4 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-});
+}); 
