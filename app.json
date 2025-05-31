@@ -13,7 +13,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vaultify.ethglobalprague",
+      "bundleIdentifier": "com.vaultify.app",
+   
       "config": {
         "googleMapsApiKey": "YOUR_IOS_API_KEY"
       }
@@ -23,8 +24,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.vaultify.ethglobalprague",
+      "package": "com.vaultify.app",
+  
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_ANDROID_API_KEY"
@@ -43,13 +44,13 @@
           "cameraPermission": "Allow SnapVault to access your camera to take photos and record videos for snaps."
         }
       ],
-      "expo-video",
       [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Vaultify to use your location."
         }
-      ]
+      ],
+      "react-native-video"
     ],
     "experiments": {
       "typedRoutes": true
