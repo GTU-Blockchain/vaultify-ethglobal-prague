@@ -3,6 +3,7 @@ import { ResizeMode, Video } from 'expo-av';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,13 +12,14 @@ import { Colors } from '../constants/Colors';
 import { useTheme } from '../context/ThemeContext';
 
 export default function CameraScreen() {
+  const { username: routeUsername } = useLocalSearchParams();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [media, setMedia] = useState<{ uri: string; type: 'photo' | 'video' } | null>(null);
   const [showVaultModal, setShowVaultModal] = useState(false);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(routeUsername ? String(routeUsername) : '');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [cameraType, setCameraType] = useState<'front' | 'back'>('back');
@@ -473,5 +475,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-}); 
+});
 

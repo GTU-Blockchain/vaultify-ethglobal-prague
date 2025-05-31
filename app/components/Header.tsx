@@ -6,9 +6,10 @@ import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
   onConnectWallet: () => void;
+  onToggleTheme: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onConnectWallet }) => {
+export const Header: React.FC<HeaderProps> = ({ onConnectWallet, onToggleTheme }) => {
   const { theme, colors, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -98,4 +99,4 @@ const styles = StyleSheet.create({
     minWidth: 40,
     alignItems: 'center',
   },
-}); 
+});

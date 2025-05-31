@@ -50,8 +50,11 @@ export default function VaultListScreen() {
   ];
 
   const handleCreateVault = () => {
-    // Yeni vault oluşturma işlemi burada yapılacak
-    console.log('Creating new vault for:', name);
+    // Kameraya yönlendir, kullanıcı bilgilerini gönder
+    router.push({
+      pathname: '/(tabs)/camera',
+      params: { username: name, userId: id }
+    });
   };
 
   return (
