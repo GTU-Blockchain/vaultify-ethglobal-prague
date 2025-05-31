@@ -246,7 +246,7 @@ export const NavigationHeader = () => {
       </TouchableOpacity>
       
       <Text style={[styles.title, { color: colors.text }]}>
-        VAULTIFY
+        Vaultify
       </Text>
       
       <TouchableOpacity 
@@ -282,13 +282,20 @@ export const NavigationHeader = () => {
         </View>
       )}
 
-      {/* Wallet Details Modal */}
-      <Modal visible={showWalletModal} animationType="slide" transparent>
+      {/* Wallet Details Modal */}      <Modal visible={showWalletModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modal, { backgroundColor: colors.background }]}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.modal, { 
+            backgroundColor: colors.background,
+            borderColor: colors.icon + '20'
+          }]}>
+            <View style={[styles.modalHeader, { 
+              borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+            }]}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Wallet Details</Text>
-              <TouchableOpacity onPress={() => setShowWalletModal(false)}>
+              <TouchableOpacity 
+                onPress={() => setShowWalletModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -296,32 +303,72 @@ export const NavigationHeader = () => {
             {/* Network Status */}
             {!isOnFlowTestnet && (
               <View style={styles.networkWarning}>
-                <Ionicons name="warning" size={20} color="#ff6b6b" />
-                <Text style={styles.networkWarningText}>Wrong Network</Text>
-                <TouchableOpacity style={styles.switchButton} onPress={handleSwitchNetwork}>
-                  <Text style={styles.switchButtonText}>Switch to Flow Testnet</Text>
-                </TouchableOpacity>
+                <Ionicons name="warning-outline" size={24} color={colors.text} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.networkWarningText, { 
+                    color: colors.text,
+                    marginBottom: 8
+                  }]}>
+                    Wrong Network Detected
+                  </Text>
+                  <Text style={{ color: colors.text, opacity: 0.6 }}>
+                    Please switch to Flow Testnet to continue using Vaultify
+                  </Text>
+                </View>
               </View>
             )}
 
-            <View style={styles.walletInfo}>
-              <Text style={[styles.label, { color: colors.text }]}>Username:</Text>
-              <Text style={[styles.value, { color: colors.text }]}>
+            <View style={[styles.walletInfo, { 
+              backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+              borderColor: colors.icon + '20'
+            }]}>
+              <Text style={[styles.label, { color: colors.text }]}>Username</Text>
+              <Text style={[styles.value, { color: colors.text }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {username ? `@${username}` : 'Not registered'}
               </Text>
               
-              <Text style={[styles.label, { color: colors.text }]}>Address:</Text>
-              <Text style={[styles.value, { color: colors.text }]}>{address}</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Wallet Address</Text>
+              <Text style={[styles.value, { color: colors.text }]} numberOfLines={1}>
+                {address}
+              </Text>
               
-              <Text style={[styles.label, { color: colors.text }]}>Balance:</Text>
-              <Text style={[styles.value, { color: colors.text }]}>{balance} FLOW</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Balance</Text>
+              <Text style={[styles.value, { color: colors.text }]}>
+                {balance} FLOW
+              </Text>
 
               <NetworkStatusDisplay />
             </View>
 
-            <TouchableOpacity style={styles.actionButton} onPress={handleGetFaucet}>
-              <Text style={styles.actionButtonText}>💧 Get Test FLOW</Text>
-            </TouchableOpacity>            <TouchableOpacity style={styles.disconnectButton} onPress={handleDisconnect}>
+            {!isOnFlowTestnet && (
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: colors.tint }]} 
+                onPress={handleSwitchNetwork}
+              >
+                <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                  Switch to Flow Testnet
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: colors.tint }]} 
+              onPress={handleGetFaucet}
+            >
+              <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                💧 Get Test FLOW
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.disconnectButton, { 
+                backgroundColor: theme === 'dark' ? 'rgba(255,59,48,0.9)' : '#FF3B30'
+              }]} 
+              onPress={handleDisconnect}
+            >
               <Text style={styles.disconnectButtonText}>Disconnect Wallet</Text>
             </TouchableOpacity>
           </View>
@@ -331,10 +378,18 @@ export const NavigationHeader = () => {
       {/* Username Registration Modal */}
       <Modal visible={showUsernameModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modal, { backgroundColor: colors.background }]}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.modal, { 
+            backgroundColor: colors.background,
+            borderColor: colors.icon + '20'
+          }]}>
+            <View style={[styles.modalHeader, { 
+              borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+            }]}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Register Username</Text>
-              <TouchableOpacity onPress={() => setShowUsernameModal(false)}>
+              <TouchableOpacity 
+                onPress={() => setShowUsernameModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -342,32 +397,39 @@ export const NavigationHeader = () => {
             {/* Connection Status Check */}
             {!isConnected ? (
               <View style={styles.connectionPrompt}>
+                <Ionicons name="wallet-outline" size={48} color={colors.text} style={{ marginBottom: 16, opacity: 0.5 }} />
                 <Text style={[styles.description, { color: colors.text }]}>
-                  Please connect your wallet first
+                  Connect your wallet to start using Vaultify
                 </Text>
-                <TouchableOpacity style={styles.connectButton} onPress={handleConnect}>
-                  <Text style={styles.connectButtonText}>Connect Wallet</Text>
+                <TouchableOpacity style={[styles.connectButton, { backgroundColor: colors.tint }]} onPress={handleConnect}>
+                  <Text style={[styles.connectButtonText, { color: colors.background }]}>
+                    Connect Wallet
+                  </Text>
                 </TouchableOpacity>
               </View>
             ) : !isOnFlowTestnet ? (
-              <View style={styles.connectionPrompt}>                <Text style={[styles.description, { color: colors.text }]}>
-                  Please switch to Flow testnet to continue
+              <View style={styles.connectionPrompt}>
+                <Ionicons name="warning-outline" size={48} color={colors.text} style={{ marginBottom: 16 }} />
+                <Text style={[styles.description, { color: colors.text }]}>
+                  Wrong network detected. Please switch to Flow Testnet to continue.
                 </Text>
-                <TouchableOpacity style={styles.switchButton} onPress={handleSwitchNetwork}>
-                  <Text style={styles.switchButtonText}>Switch to Flow Testnet</Text>
+                <TouchableOpacity style={[styles.switchButton, { backgroundColor: colors.tint }]} onPress={handleSwitchNetwork}>
+                  <Text style={[styles.switchButtonText, { color: colors.background }]}>
+                    Switch to Flow Testnet
+                  </Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <>
                 <Text style={[styles.description, { color: colors.text }]}>
-                  Choose a unique username for your account
+                  Choose a unique username to identify yourself in the Vaultify ecosystem
                 </Text>
                 
                 <View style={styles.inputContainer}>
                   <TextInput
                     style={[styles.input, { 
-                      backgroundColor: colors.background, 
-                      borderColor: colors.text, 
+                      backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                      borderColor: colors.icon + '20',
                       color: colors.text 
                     }]}
                     placeholder="Enter username (3-20 characters)"
@@ -376,16 +438,17 @@ export const NavigationHeader = () => {
                     onChangeText={setUsernameInput}
                     maxLength={20}
                     autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="off"
                   />
                   
-                  {/* Username Availability Indicator */}
                   <View style={styles.availabilityIndicator}>
                     {isCheckingUsername ? (
-                      <ActivityIndicator size="small" color={colors.icon} />
+                      <ActivityIndicator size="small" color={colors.text} />
                     ) : usernameAvailable === true ? (
-                      <Ionicons name="checkmark-circle" size={20} color="#28a745" />
+                      <Ionicons name="checkmark-circle" size={24} color={colors.tint} />
                     ) : usernameAvailable === false ? (
-                      <Ionicons name="close-circle" size={20} color="#ff6b6b" />
+                      <Ionicons name="close-circle" size={24} color={theme === 'dark' ? 'rgba(255,59,48,0.9)' : '#FF3B30'} />
                     ) : null}
                   </View>
                 </View>
@@ -393,28 +456,35 @@ export const NavigationHeader = () => {
                 {/* Availability Status Text */}
                 {usernameInput.length > 0 && (
                   <Text style={[styles.availabilityText, {
-                    color: usernameAvailable === true ? '#28a745' : 
-                           usernameAvailable === false ? '#ff6b6b' : colors.icon
+                    color: usernameAvailable === true ? colors.tint : 
+                           usernameAvailable === false ? (theme === 'dark' ? 'rgba(255,59,48,0.9)' : '#FF3B30') : 
+                           colors.text,
+                    opacity: 0.9
                   }]}>
                     {isCheckingUsername ? 'Checking availability...' :
                      usernameAvailable === true ? '✓ Username available!' :
                      usernameAvailable === false ? '✗ Username already taken' :
-                     usernameInput.length < 3 ? 'Minimum 3 characters required' : ''}
+                     usernameInput.length < 3 ? 'Username must be at least 3 characters' : ''}
                   </Text>
                 )}
 
                 <TouchableOpacity 
                   style={[
-                    styles.registerButton,
-                    { opacity: (usernameAvailable === true && !isLoading) ? 1 : 0.5 }
+                    styles.registerButton, 
+                    { 
+                      backgroundColor: colors.tint,
+                      opacity: (usernameAvailable === true && !isLoading) ? 1 : 0.5 
+                    }
                   ]} 
-                  onPress={handleRegisterUsername} 
+                  onPress={handleRegisterUsername}
                   disabled={isLoading || usernameAvailable !== true}
                 >
                   {isLoading ? (
-                    <ActivityIndicator color="white" />
+                    <ActivityIndicator color={colors.background} />
                   ) : (
-                    <Text style={styles.registerButtonText}>Register Username</Text>
+                    <Text style={[styles.registerButtonText, { color: colors.background }]}>
+                      Register Username
+                    </Text>
                   )}
                 </TouchableOpacity>
               </>
@@ -426,13 +496,13 @@ export const NavigationHeader = () => {
   );
 };
 
-const styles = StyleSheet.create({  header: {
+const styles = StyleSheet.create({
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    
   },
   leftButton: {
     padding: 8,
@@ -446,7 +516,8 @@ const styles = StyleSheet.create({  header: {
     fontWeight: 'bold',
     flex: 1,
     textAlign: 'center',
-  },walletButton: {
+  },
+  walletButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -483,143 +554,144 @@ const styles = StyleSheet.create({  header: {
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   modal: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
     paddingBottom: 40,
+    borderWidth: 1,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
   },
   networkWarning: {
-    backgroundColor: '#fff3cd',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   networkWarningText: {
-    color: '#856404',
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
   },
   switchButton: {
-    backgroundColor: '#ffc107',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
   switchButtonText: {
-    color: '#000',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
   },
   walletInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    borderWidth: 1,
   },
   label: {
-    fontWeight: 'bold',
-    marginTop: 5,
+    fontWeight: '600',
+    marginTop: 8,
+    fontSize: 15,
+    opacity: 0.8,
   },
   value: {
     fontFamily: 'monospace',
-    marginBottom: 10,
+    marginBottom: 12,
+    fontSize: 15,
   },
   actionButton: {
-    backgroundColor: '#6c757d',
-    padding: 15,
-    borderRadius: 10,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   actionButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   disconnectButton: {
-    backgroundColor: '#dc3545',
-    padding: 15,
-    borderRadius: 10,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
   disconnectButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   connectionPrompt: {
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   connectButton: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 10,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    minWidth: 150,
+    minWidth: 200,
+    marginTop: 16,
   },
   connectButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   description: {
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
     fontSize: 16,
+    lineHeight: 24,
+    opacity: 0.8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    position: 'relative',
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
+    paddingRight: 40,
   },
   availabilityIndicator: {
     position: 'absolute',
-    right: 12,
-    width: 20,
-    height: 20,
+    right: 14,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   availabilityText: {
     fontSize: 14,
-    marginBottom: 15,
+    marginBottom: 20,
     textAlign: 'center',
   },
   registerButton: {
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 10,
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    marginTop: 8,
   },
   registerButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });
