@@ -14,8 +14,10 @@ export const BottomNavBar = () => {
 
   const isActive = (path: string) => pathname === path;
 
-  // navbarBackground'ı tam opak ve ana arka plan rengi yap
-  const navbarBackground = colors.background;
+  // Create a slightly lighter background color
+  const navbarBackground = colorScheme === 'dark' 
+    ? 'rgba(255, 255, 255, 0.05)' 
+    : 'rgba(0, 0, 0, 0.02)';
 
   return (
     <View style={[
@@ -26,7 +28,8 @@ export const BottomNavBar = () => {
         borderTopColor: colorScheme === 'dark' 
           ? 'rgba(255, 255, 255, 0.1)' 
           : 'rgba(0, 0, 0, 0.1)',
-        bottom: 16, // navbar'ı bir tık yukarı al
+
+
       }
     ]}>
       <TouchableOpacity 
