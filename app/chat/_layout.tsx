@@ -1,6 +1,9 @@
 import { Stack } from 'expo-router';
 
+import { useTheme } from '../context/ThemeContext';
+
 export default function ChatLayout() {
+  const { colors } = useTheme();
   return (
     <Stack
       screenOptions={{
@@ -8,7 +11,9 @@ export default function ChatLayout() {
         animation: 'slide_from_right',
         gestureEnabled: true,
         gestureDirection: 'horizontal',
-      }}
+        contentStyle: {
+          backgroundColor: 'transparent'
+        }}}
     />
   );
 }

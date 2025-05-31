@@ -1,26 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-import { 
-  ActivityIndicator, 
-  Alert, 
-  Linking, 
-  Modal, 
-  StyleSheet, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  useColorScheme, 
-  View 
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWalletConnect } from '../../hooks/useWalletConnect';
-import { Colors } from '../constants/Colors';
+import { useTheme } from '../context/ThemeContext';
 
 export const NavigationHeader = () => {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors, theme, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
   
   // Use the unified wallet hook
@@ -80,13 +77,21 @@ export const NavigationHeader = () => {
   }, [usernameInput, checkUsernameAvailability]);
 
   const handleWalletPress = () => {
+    if (isLoading) return;
+    
     if (!isConnected) {
-      handleConnect();
-    } else if (!isRegistered) {
-      setShowUsernameModal(true);
-    } else {
-      setShowWalletModal(true);
+      Alert.alert(
+        'Connect Wallet',
+        'Please connect your wallet to continue using Vaultify',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Connect', onPress: handleConnect }
+        ]
+      );
+      return;
     }
+    
+    setShowWalletModal(true);
   };
 
   const handleConnect = async () => {
@@ -182,11 +187,10 @@ export const NavigationHeader = () => {
       ]
     );
   };
-
   const getWalletStatusText = () => {
     if (!isConnected) return '';
-    if (!isRegistered) return address?.slice(0, 6) + '...';
-    return `@${username}`;
+    if (!isRegistered) return address ? address.slice(0, 4) + '...' : '';
+    return username ? `@${username.slice(0, 6)}` : '';
   };
 
   const getWalletStatusColor = () => {
@@ -203,17 +207,46 @@ export const NavigationHeader = () => {
     return "checkmark-circle-outline";
   };
 
-  return (
-    <View style={[styles.header, { 
-      paddingTop: insets.top + 10,
+  const NetworkStatusDisplay = () => {
+    const networkText = isOnFlowTestnet ? 'Flow EVM Testnet' : 'Wrong Network';
+    const statusIcon = isOnFlowTestnet ? '✓' : '⚠️';
+    const textColor = isOnFlowTestnet ? '#28a745' : '#ff6b6b';
+    
+    return (
+      <>
+        <Text style={[styles.label, { color: colors.text }]}>Network:</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Text 
+            style={[styles.value, { color: textColor }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {networkText}
+          </Text>
+          <Text style={[styles.value, { color: textColor, marginLeft: 4 }]}>
+            {statusIcon}
+          </Text>
+        </View>
+      </>
+    );
+  };
+
+  return (    <View style={[styles.header, { 
+      paddingTop: insets.top,
       backgroundColor: colors.background 
-    }]}>
-      <TouchableOpacity style={styles.leftButton}>
-        <Ionicons name="sunny" size={24} color={colors.icon} />
+    }]}>      <TouchableOpacity 
+        style={styles.leftButton}
+        onPress={toggleTheme}
+      >
+        <Ionicons 
+          name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} 
+          size={24} 
+          color={colors.icon} 
+        />
       </TouchableOpacity>
       
       <Text style={[styles.title, { color: colors.text }]}>
-        SnapVault
+        VAULTIFY
       </Text>
       
       <TouchableOpacity 
@@ -283,18 +316,13 @@ export const NavigationHeader = () => {
               <Text style={[styles.label, { color: colors.text }]}>Balance:</Text>
               <Text style={[styles.value, { color: colors.text }]}>{balance} FLOW</Text>
 
-              <Text style={[styles.label, { color: colors.text }]}>Network:</Text>
-              <Text style={[styles.value, { color: isOnFlowTestnet ? '#28a745' : '#ff6b6b' }]}>
-                {isOnFlowTestnet ? 'Flow EVM Testnet ✓' : 'Wrong Network ⚠️'}
-              </Text>
+              <NetworkStatusDisplay />
             </View>
 
             <TouchableOpacity style={styles.actionButton} onPress={handleGetFaucet}>
               <Text style={styles.actionButtonText}>💧 Get Test FLOW</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.disconnectButton} onPress={handleDisconnect}>
-              <Text style={styles.disconnectButtonText}>👋 Disconnect</Text>
+            </TouchableOpacity>            <TouchableOpacity style={styles.disconnectButton} onPress={handleDisconnect}>
+              <Text style={styles.disconnectButtonText}>Disconnect Wallet</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -322,9 +350,8 @@ export const NavigationHeader = () => {
                 </TouchableOpacity>
               </View>
             ) : !isOnFlowTestnet ? (
-              <View style={styles.connectionPrompt}>
-                <Text style={[styles.description, { color: colors.text }]}>
-                  Please switch to Flow testnet first
+              <View style={styles.connectionPrompt}>                <Text style={[styles.description, { color: colors.text }]}>
+                  Please switch to Flow testnet to continue
                 </Text>
                 <TouchableOpacity style={styles.switchButton} onPress={handleSwitchNetwork}>
                   <Text style={styles.switchButtonText}>Switch to Flow Testnet</Text>
@@ -333,7 +360,7 @@ export const NavigationHeader = () => {
             ) : (
               <>
                 <Text style={[styles.description, { color: colors.text }]}>
-                  Choose a unique username for your SnapVault account
+                  Choose a unique username for your account
                 </Text>
                 
                 <View style={styles.inputContainer}>
@@ -399,35 +426,42 @@ export const NavigationHeader = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  header: {
+const styles = StyleSheet.create({  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    
   },
   leftButton: {
     padding: 8,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  walletButton: {
+    flex: 1,
+    textAlign: 'center',
+  },walletButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
     gap: 6,
+    minWidth: 44,
+    height: 44,
   },
   walletText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
+    maxWidth: 80,
   },
   errorBanner: {
     position: 'absolute',
