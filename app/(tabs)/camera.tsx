@@ -6,7 +6,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
-import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import {Platform, Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { Colors } from '../constants/Colors';
@@ -219,7 +219,7 @@ export default function CameraScreen() {
           />
           <TouchableOpacity 
             style={[styles.flipButton, { 
-              top: insets.top + 5,
+            top: 16 ,
               right: 16
             }]}
             onPress={toggleCameraType}
@@ -341,7 +341,7 @@ export default function CameraScreen() {
             </View>
           )}
           <TouchableOpacity 
-            style={[styles.backButton, { top: insets.top + 10 }]}
+            style={[styles.backButton, { top: 16 }]}
             onPress={handleCancel}
           >
             <Ionicons name="close" size={24} color={colors.text} />
@@ -482,6 +482,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+   
   },
   captureButton: {
     width: 70,
@@ -527,16 +528,36 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    left: 20,
-    padding: 10,
+    left: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 25,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   sendButton: {
     position: 'absolute',
-    right: 20,
+    right: 16,
     bottom: 100,
-    padding: 10,
+    padding: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 25,
+     zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   modalContainer: {
     flex: 1,
