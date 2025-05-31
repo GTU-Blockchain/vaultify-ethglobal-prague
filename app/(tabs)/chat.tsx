@@ -27,7 +27,10 @@ export default function ChatScreen() {
           <Person
             key={person.id}
             name={person.name}
-            onPress={() => router.push(`/chat/${person.id}?name=${person.name}`)}
+            onPress={() => router.push({
+              pathname: '/(tabs)/chat/[id]',
+              params: { id: person.id, name: person.name }
+            })}
           />
         ))}
       </ScrollView>

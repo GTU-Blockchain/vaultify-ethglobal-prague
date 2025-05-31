@@ -1,9 +1,10 @@
 
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
-import { Stack } from 'expo-router';
+import { Slot, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Polyfill crypto.getRandomValues
 if (typeof global.crypto === 'undefined') {
