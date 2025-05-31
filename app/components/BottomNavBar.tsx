@@ -14,12 +14,20 @@ export const BottomNavBar = () => {
 
   const isActive = (path: string) => pathname === path;
 
+  // Create a slightly lighter background color
+  const navbarBackground = colorScheme === 'dark' 
+    ? 'rgba(255, 255, 255, 0.05)' 
+    : 'rgba(0, 0, 0, 0.02)';
+
   return (
     <View style={[
       styles.container, 
       { 
-        backgroundColor: colors.background,
+        backgroundColor: navbarBackground,
         paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
+        borderTopColor: colorScheme === 'dark' 
+          ? 'rgba(255, 255, 255, 0.1)' 
+          : 'rgba(0, 0, 0, 0.1)',
       }
     ]}>
       <TouchableOpacity 
@@ -65,12 +73,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: '2%',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     minHeight: 60,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
   },
   navItem: {
     padding: '2%',
