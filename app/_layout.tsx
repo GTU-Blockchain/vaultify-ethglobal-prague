@@ -1,7 +1,6 @@
-
 import { getRandomValues } from 'expo-crypto';
 import * as Linking from 'expo-linking';
-import { Slot, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -72,20 +71,24 @@ export default function RootLayout() {
   }, []);
 
   if (!isReady) {
-    // You can show a loading screen here
     return (
-    <ThemeProvider>
+      <ThemeProvider>
         <SafeAreaProvider>
-        <Slot />
-        <View style={styles.container}>
-        {/* Add a loading spinner or splash screen here if needed */}
-      </View>
-      </SafeAreaProvider>
-    </ThemeProvider>
+          <View style={styles.container}>
+            {/* Add a loading spinner or splash screen here if needed */}
+          </View>
+        </SafeAreaProvider>
+      </ThemeProvider>
     );
   }
 
-
+  return (
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <Stack />
+      </SafeAreaProvider>
+    </ThemeProvider>
+  );
 }
 
 const styles = StyleSheet.create({
