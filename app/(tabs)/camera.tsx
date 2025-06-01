@@ -43,6 +43,7 @@ export default function CameraScreen() {
   const [content, setContent] = useState('');
   const [recipientAddress, setRecipientAddress] = useState(routeUsername ? String(routeUsername) : '');
   const [flowAmount, setFlowAmount] = useState('');
+  const [isImmediateVault, setIsImmediateVault] = useState(false);
   
   // Username registration state
   const [showUsernameModal, setShowUsernameModal] = useState(false);
@@ -112,7 +113,8 @@ export default function CameraScreen() {
     now.setHours(0, 0, 0, 0); // Reset time to compare dates only
     selectedDate.setHours(0, 0, 0, 0);
     
-    if (selectedDate <= now) {
+    // Skip future date validation for immediate vaults
+    if (!isImmediateVault && selectedDate <= now) {
       handleError('Unlock date must be in the future');
       return false;
     }
@@ -263,7 +265,8 @@ export default function CameraScreen() {
       return;
     }
 
-    setIsCreatingVault(true);    try {
+    setIsCreatingVault(true);
+    try {
       // Since we already check isRegistered in the main render condition,
       // we don't need to check username again here
       const result = await vaultService.createVault({
@@ -274,6 +277,7 @@ export default function CameraScreen() {
         flowAmount: flowAmount.trim(),
         mediaUri: media?.uri,
         mediaType: media?.type,
+        isImmediateVault: isImmediateVault
       });
 
       console.log('Vault created successfully:', result);
@@ -380,6 +384,18 @@ export default function CameraScreen() {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     return formatDateForInput(tomorrow);
+  };
+
+  // Handle immediate vault toggle
+  const handleImmediateVaultToggle = () => {
+    setIsImmediateVault(!isImmediateVault);
+    if (!isImmediateVault) {
+      // Set unlock date to today when enabling immediate vault
+      setUnlockDate(formatDateForInput(new Date()));
+    } else {
+      // Reset to minimum date when disabling immediate vault
+      setUnlockDate(getMinDate());
+    }
   };
 
   if (!permission) {
@@ -673,10 +689,35 @@ export default function CameraScreen() {
                 placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
                 keyboardType="numeric"
                 maxLength={10}
+                editable={!isImmediateVault}
               />
-              <Text style={[styles.helperText, { color: theme === 'dark' ? colors.text + '60' : '#1B3B4B' + '60' }]}>
-                Minimum date: {getMinDate()}
-              </Text>
+              <View style={styles.immediateVaultContainer}>
+                <TouchableOpacity 
+                  style={styles.checkboxContainer} 
+                  onPress={handleImmediateVaultToggle}
+                >
+                  <View style={[
+                    styles.checkbox, 
+                    { 
+                      backgroundColor: isImmediateVault ? (theme === 'dark' ? colors.tint : '#2E8B57') : 'transparent',
+                      borderColor: theme === 'dark' ? colors.text + '40' : '#1B3B4B' + '40'
+                    }
+                  ]}>
+                    {isImmediateVault && (
+                      <Ionicons name="checkmark" size={16} color="white" />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.checkboxLabel, 
+                    { color: theme === 'dark' ? colors.text : '#1B3B4B' }
+                  ]}>
+                    Create Immediate Vault
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.helperText, { color: theme === 'dark' ? colors.text + '60' : '#1B3B4B' + '60' }]}>
+                  {isImmediateVault ? 'Recipient can open this vault after 10 seconds' : `Minimum date: ${getMinDate()}`}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.inputContainer}>
@@ -1214,5 +1255,26 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  immediateVaultContainer: {
+    marginTop: 8,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
