@@ -13,6 +13,7 @@ interface CreateVaultParams {
   flowAmount: string;
   mediaUri?: string;
   mediaType?: 'photo' | 'video';
+  isImmediateVault?: boolean;
 }
 
 interface VaultData {
@@ -26,6 +27,21 @@ interface VaultData {
   unlockAt: number;
   isOpened: boolean;
   snapType: number; // 0 = Instant, 1 = Timed
+}
+
+interface VaultDetails {
+  id: number;
+  senderUsername: string;
+  recipientUsername: string;
+  message: string;
+  flowAmount: string;
+  createdAt: number;
+  unlockAt: number;
+  isOpened: boolean;
+  snapType: number;
+  metadata?: VaultMetadata;
+  mediaUrl?: string;
+  mediaType?: 'photo' | 'video';
 }
 
 class VaultService {
@@ -350,7 +366,7 @@ class VaultService {
         throw new Error('Wallet not connected.');
       }
 
-      console.log('✅ Validation passed');      // Get current address to use in metadata
+      console.log('✅ Validation passed');
       const currentUsername = await this.getCurrentUsername();
       console.log('👤 Current username:', currentUsername);
 
@@ -375,44 +391,55 @@ class VaultService {
       // Calculate unlock timestamp with proper validation
       console.log('📅 Input unlock date:', params.unlockDate);
       
-      // Try different date parsing approaches
-      let unlockDate: Date;
-      
-      // First try: Add T00:00:00 for proper parsing
-      unlockDate = new Date(params.unlockDate + 'T00:00:00');
-      
-      // If that fails, try direct parsing
-      if (isNaN(unlockDate.getTime())) {
-        unlockDate = new Date(params.unlockDate);
-      }
-      
-      // If still fails, try parsing as ISO string
-      if (isNaN(unlockDate.getTime())) {
-        unlockDate = new Date(params.unlockDate + 'T00:00:00.000Z');
-      }
-      
-      console.log('📅 Parsed unlock date:', unlockDate);
-      console.log('📅 Date is valid:', !isNaN(unlockDate.getTime()));
-      
-      if (isNaN(unlockDate.getTime())) {
-        throw new Error(`Invalid unlock date format. Received: "${params.unlockDate}". Please use YYYY-MM-DD format.`);
-      }
-      
-      const unlockTimestamp = Math.floor(unlockDate.getTime() / 1000);
+      // For immediate vaults, use current timestamp
       const currentTimestamp = Math.floor(Date.now() / 1000);
-      
-      console.log('⏰ Timestamps calculated:', { 
-        unlockTimestamp, 
-        currentTimestamp,
-        unlockDate: unlockDate.toISOString(),
-        currentDate: new Date().toISOString()
-      });
-      
-      if (unlockTimestamp <= currentTimestamp) {
-        throw new Error('Unlock date must be in the future.');
+      let unlockDelaySeconds: number;
+
+      if (params.isImmediateVault) {
+        console.log('⚡ Creating immediate vault');
+        unlockDelaySeconds = 10; // 10 seconds delay for immediate vaults
+      } else {
+        // Try different date parsing approaches for future vaults
+        let unlockDate: Date;
+        
+        // First try: Add T00:00:00 for proper parsing
+        unlockDate = new Date(params.unlockDate + 'T00:00:00');
+        
+        // If that fails, try direct parsing
+        if (isNaN(unlockDate.getTime())) {
+          unlockDate = new Date(params.unlockDate);
+        }
+        
+        // If still fails, try parsing as ISO string
+        if (isNaN(unlockDate.getTime())) {
+          unlockDate = new Date(params.unlockDate + 'T00:00:00.000Z');
+        }
+        
+        console.log('📅 Parsed unlock date:', unlockDate);
+        console.log('📅 Date is valid:', !isNaN(unlockDate.getTime()));
+        
+        if (isNaN(unlockDate.getTime())) {
+          throw new Error(`Invalid unlock date format. Received: "${params.unlockDate}". Please use YYYY-MM-DD format.`);
+        }
+        
+        const unlockTimestamp = Math.floor(unlockDate.getTime() / 1000);
+        
+        console.log('⏰ Timestamps calculated:', { 
+          unlockTimestamp, 
+          currentTimestamp,
+          unlockDate: unlockDate.toISOString(),
+          currentDate: new Date().toISOString()
+        });
+        
+        // For future vaults, use the calculated delay
+        unlockDelaySeconds = unlockTimestamp - currentTimestamp;
+        
+        // Ensure minimum delay of 10 seconds
+        if (unlockDelaySeconds < 10) {
+          unlockDelaySeconds = 10;
+        }
       }
 
-      const unlockDelaySeconds = unlockTimestamp - currentTimestamp;
       console.log('⏰ Unlock delay seconds:', unlockDelaySeconds);
 
       let mediaHash: string | undefined;
@@ -487,7 +514,7 @@ class VaultService {
           metadataHash, // Metadata IPFS hash
           params.content, // Just the user message, not comprehensive metadata
           unlockDelaySeconds,
-          1 // SnapType.Timed
+          params.isImmediateVault ? 0 : 1 // SnapType.Instant (0) or SnapType.Timed (1)
         ],
         params.flowAmount // Pass as string, don't use BigInt toString
       );
@@ -978,5 +1005,5 @@ class VaultService {
 }
 
 export const vaultService = new VaultService();
-export type { CreateVaultParams, VaultData };
+export type { CreateVaultParams, VaultData, VaultDetails };
 
