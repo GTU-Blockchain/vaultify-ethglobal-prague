@@ -749,12 +749,13 @@ class VaultService {
 
       // Get the next snap ID to know how many vaults to check
       const nextId = await contract.nextSnapId();
-      console.log('📊 Total vaults to check:', nextId - 1);
+      const nextIdNumber = Number(nextId);
+      console.log('📊 Total vaults to check:', nextIdNumber - 1);
       
       const vaults: VaultData[] = [];
 
       // Iterate through all vaults to find ones sent by current user
-      for (let i = 1; i < nextId; i++) {
+      for (let i = 1; i < nextIdNumber; i++) {
         try {
           console.log(`🔍 Checking vault ${i}...`);
           const vaultData = await this.getVault(i);
