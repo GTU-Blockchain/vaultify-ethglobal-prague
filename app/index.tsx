@@ -14,5 +14,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={{ pathname: isConnected ? "/(tabs)/camera" : "/(tabs)/dashboard" as const }} />;
+  return <Redirect href={{ pathname: "/(tabs)/camera" as const }} />;
 }

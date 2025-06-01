@@ -1,46 +1,115 @@
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomNavBar } from '../components/BottomNavBar';
 import { useTheme } from '../context/ThemeContext';
+import { blockscoutService } from '../services/BlockscoutService';
+import { vaultService } from '../services/VaultService';
+import { walletConnectService } from '../services/WalletConnectService';
+
+interface VaultData {
+  id: number;
+  senderUsername: string;
+  recipientUsername: string;
+  ipfsCID: string;
+  message: string;
+  flowAmount: string;
+  createdAt: number;
+  unlockAt: number;
+  isOpened: boolean;
+  snapType: number;
+}
 
 export default function DashboardScreen() {
   const { colors, theme } = useTheme();
   const insets = useSafeAreaInsets();
-  // Demo user data
-  const user = {
-    username: 'jessica.w',
-    displayName: 'Jessica',
-    wallet: '0xA1b2...C3d4',
-  };
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState({
+    username: '',
+    displayName: '',
+    wallet: '',
+  });
+  const [vaults, setVaults] = useState<VaultData[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [showArchiveCalendar, setShowArchiveCalendar] = useState(false);
 
-  // Mock vault data (will be fetched from blockchain later)
-  const vaults = [
-    { date: '2025-06-01', unlocked: true },
-    { date: '2025-06-03', unlocked: false },
-    { date: '2025-06-07', unlocked: true },
-  ];
   // Months and years
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
   const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [showArchiveCalendar, setShowArchiveCalendar] = useState(false);
-
-  // Yıl aralığı (örnek: son 3 yıl)
   const yearRange = Array.from({ length: 3 }, (_, i) => today.getFullYear() - i).reverse();
 
-  // Takvimde işaretlenecek günler (açık: pastel yeşil, kapalı: pastel kırmızı)
-  const markedDates = vaults.reduce((acc, v) => {
-    acc[v.date] = {
+  useEffect(() => {
+    if (walletConnectService.isWalletConnected()) {
+      loadData();
+    }
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const address = walletConnectService.getCurrentAddress();
+      if (!address) return;
+
+      // Get user data
+      const username = await vaultService.getCurrentUsername();
+      setUser({
+        username: username || '',
+        displayName: username || '',
+        wallet: blockscoutService.formatAddress(address),
+      });
+
+      // Get vaults
+      const [receivedVaults, sentVaults] = await Promise.all([
+        vaultService.getReceivedVaults(),
+        vaultService.getSentVaults()
+      ]);
+
+      console.log(`📥 Found ${receivedVaults.length} received vaults`);
+      console.log(`📤 Found ${sentVaults.length} sent vaults`);
+
+      // Combine and sort vaults
+      const allVaults = [...receivedVaults, ...sentVaults].sort((a, b) => b.createdAt - a.createdAt);
+      setVaults(allVaults);
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create marked dates for calendar
+  const markedDates = vaults.reduce((acc, vault) => {
+    const isSent = vault.senderUsername.toLowerCase() === user.username.toLowerCase();
+    const isReceived = !isSent;
+    const isLocked = !vault.isOpened;
+
+    // For sent vaults, use creation date
+    // For received vaults, use unlock date if locked, creation date if unlocked
+    const date = new Date(
+      (isReceived && isLocked ? vault.unlockAt : vault.createdAt) * 1000
+    ).toISOString().split('T')[0];
+
+    // If we already have a vault for this date, keep the existing one
+    if (acc[date]) return acc;
+
+    acc[date] = {
       selected: true,
-      selectedColor: theme === 'dark' ? '#A8E6CF' : '#4A90E2',
-      selectedTextColor: theme === 'dark' ? '#333' : '#fff',
+      selectedColor: isSent 
+        ? '#4A90E2' // Blue for sent
+        : isLocked 
+          ? '#FF8B94' // Red for locked received
+          : '#A8E6CF', // Green for unlocked received
+      selectedTextColor: '#222',
+      dotColor: isSent 
+        ? '#4A90E2' // Blue for sent
+        : isLocked 
+          ? '#FF8B94' // Red for locked received
+          : '#A8E6CF', // Green for unlocked received
     };
     return acc;
   }, {} as Record<string, any>);
@@ -57,6 +126,7 @@ export default function DashboardScreen() {
     setSelectedMonth(month);
     setShowArchiveCalendar(false);
   };
+
   // Create calendar days (week starts on Monday)
   function getMonthMatrix(year: number, month: number) {
     const firstDay = new Date(year, month, 1);
@@ -78,18 +148,33 @@ export default function DashboardScreen() {
     }
     return matrix;
   }
+
   // Group vault days by month
   function getVaultDaysByMonth(year: number, month: number) {
-    // Return the days in the given year and month from the vaults array
     return vaults
-      .filter(v => {
-        const d = new Date(v.date);
-        return d.getFullYear() === year && d.getMonth() === month;
+      .filter(vault => {
+        const isSent = vault.senderUsername.toLowerCase() === user.username.toLowerCase();
+        const isLocked = !vault.isOpened;
+        const date = new Date(
+          (!isSent && isLocked ? vault.unlockAt : vault.createdAt) * 1000
+        );
+        return date.getFullYear() === year && date.getMonth() === month;
       })
-      .map(v => ({
-        day: new Date(v.date).getDate(),
-        unlocked: v.unlocked
-      }));
+      .map(vault => {
+        const isSent = vault.senderUsername.toLowerCase() === user.username.toLowerCase();
+        const isLocked = !vault.isOpened;
+        const date = new Date(
+          (!isSent && isLocked ? vault.unlockAt : vault.createdAt) * 1000
+        );
+        return {
+          day: date.getDate(),
+          isSent,
+          isLocked,
+          vaultId: vault.id,
+          unlockAt: vault.unlockAt,
+          createdAt: vault.createdAt
+        };
+      });
   }
 
   const WeekDayHeader = () => {
@@ -173,7 +258,8 @@ export default function DashboardScreen() {
             resizeMode="contain"
           />
         </View>
-        {/* Header */}        <View style={styles.headerRow}>
+        {/* Header */}
+        <View style={styles.headerRow}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{user.displayName}'s Dashboard</Text>
         </View>
         {/* Account Info */}
@@ -183,22 +269,29 @@ export default function DashboardScreen() {
         }]}>
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, { color: colors.text }]}>Wallet</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user.wallet}</Text>
+            <Text 
+              style={[styles.infoValue, { color: colors.text }]}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {user.wallet}
+            </Text>
           </View>
         </View>
-        {/* Takvim */}
+        {/* Calendar */}
         <View style={[styles.calendarContainer, { 
           backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
           borderColor: colors.icon + '20'
         }]}>  
-          {/* Takvim başlığı */}
+          {/* Calendar header */}
           <TouchableWithoutFeedback onPress={handleMonthTitlePress}>
             <View style={{ alignItems: 'center', paddingVertical: 8 }}>
               <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}> 
-                {monthNames[selectedMonth]} {selectedYear}
+                Memory Lane
               </Text>
             </View>
-          </TouchableWithoutFeedback>          <Calendar
+          </TouchableWithoutFeedback>
+          <Calendar
             current={calendarMonth}
             markedDates={markedDates}
             style={{ 
@@ -215,20 +308,39 @@ export default function DashboardScreen() {
               selectedDayBackgroundColor: theme === 'dark' ? '#A8E6CF' : '#4A90E2',
               selectedDayTextColor: theme === 'dark' ? '#333' : '#fff',
               todayTextColor: colors.tint,
-              dayTextColor: colors.text,
-              textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+              dayTextColor: theme === 'dark' ? '#fff' : colors.text,
+              textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)',
               dotColor: 'transparent',
-              arrowColor: colors.text,
+              arrowColor: theme === 'dark' ? '#fff' : colors.text,
               monthTextColor: colors.text,
               indicatorColor: colors.tint,
               textDayFontWeight: 'bold',
               textDayFontSize: 18,
-              textMonthFontSize: 18,
-              textMonthFontWeight: 'bold',
+              textMonthFontSize: 24,
+              textMonthFontWeight: '800',
               textDayHeaderFontSize: 14,
               textDayHeaderFontWeight: '600',
-              
-              
+            }}
+            renderHeader={(date?: any) => {
+              if (!date) return null;
+              const month = monthNames[date.getMonth()];
+              const year = date.getFullYear();
+              return (
+                <View style={{ 
+                  flexDirection: 'row', 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  paddingVertical: 8
+                }}>
+                  <Text style={{ 
+                    fontSize: 24, 
+                    fontWeight: '800', 
+                    color: theme === 'dark' ? '#fff' : colors.text 
+                  }}>
+                    {month} {year}
+                  </Text>
+                </View>
+              );
             }}
             dayComponent={({ date, state, marking }) => (
               <CalendarDay
@@ -236,9 +348,9 @@ export default function DashboardScreen() {
                 state={state}
                 marking={marking}
                 theme={{
-                  textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                  textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)',
                   todayTextColor: colors.tint,
-                  dayTextColor: colors.text,
+                  dayTextColor: theme === 'dark' ? '#fff' : colors.text,
                   textDayFontSize: 18
                 }}
               />
@@ -251,7 +363,7 @@ export default function DashboardScreen() {
             enableSwipeMonths={true}
           />
         </View>
-        {/* Instagram arşiv takvimi modalı */}
+        {/* Archive calendar modal */}
         <Modal
           visible={showArchiveCalendar}
           animationType="slide"
@@ -259,7 +371,8 @@ export default function DashboardScreen() {
           onRequestClose={() => setShowArchiveCalendar(false)}
         >
           <View style={{ flex: 1, backgroundColor: colors.background }}>
-            <View style={{ flex: 1, paddingTop: insets.top }}>              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, marginBottom: 8 }}>
+            <View style={{ flex: 1, paddingTop: insets.top }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, marginBottom: 8 }}>
                 <TouchableOpacity onPress={() => setShowArchiveCalendar(false)} style={{ padding: 8 }}>
                   <Text style={[{ color: colors.text, fontSize: 24, fontWeight: '300' }]}>✕</Text>
                 </TouchableOpacity>
@@ -273,8 +386,10 @@ export default function DashboardScreen() {
                 getItemLayout={(_, index) => ({ length: 300, offset: 300 * index, index })}
                 keyExtractor={item => `${item.year}-${item.month}`}
                 renderItem={({ item }) => {
-                  const vaultDays = getVaultDaysByMonth(item.year, item.month);
-                  const matrix = getMonthMatrix(item.year, item.month);
+                  const monthDate = `${item.year}-${String(item.month + 1).padStart(2, '0')}-01`;
+                  const monthMarkedDates = Object.entries(markedDates)
+                    .filter(([date]) => date.startsWith(`${item.year}-${String(item.month + 1).padStart(2, '0')}`))
+                    .reduce((acc, [date, marking]) => ({ ...acc, [date]: marking }), {});
 
                   return (
                     <View style={{ 
@@ -288,36 +403,53 @@ export default function DashboardScreen() {
                     }}>
                       <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 20, textAlign: 'center', marginBottom: 8 }}>{item.name} {item.year}</Text>
                       <WeekDayHeader />
-                      {matrix.map((week, wIdx) => (
-                        <View key={wIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 2 }}>
-                          {week.map((day, dIdx) => {
-                            const vault = day ? vaultDays.find(v => v.day === day) : null;
-                            return (
-                              <TouchableOpacity
-                                key={dIdx}
-                                style={{
-                                  width: 32,
-                                  height: 32,
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  borderRadius: 16,
-                                  backgroundColor: vault
-                                    ? (vault.unlocked ? '#A8E6CF' : '#FF8B94')
-                                    : 'transparent',
-                                }}
-                                disabled={!vault}
-                                onPress={() => vault && handleSelectMonth(item.year, item.month)}
-                              >
-                                {day && <Text style={{ 
-                                  color: vault ? '#222' : colors.text, 
-                                  fontWeight: vault ? 'bold' : 'normal',
-                                  opacity: vault ? 1 : 0.5 
-                                }}>{day}</Text>}
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      ))}
+                      <Calendar
+                        current={monthDate}
+                        markedDates={monthMarkedDates}
+                        style={{ 
+                          width: '100%', 
+                          alignSelf: 'center',
+                          backgroundColor: 'transparent'
+                        }}
+                        theme={{
+                          backgroundColor: 'transparent',
+                          calendarBackground: 'transparent',
+                          textSectionTitleColor: colors.text,
+                          selectedDayBackgroundColor: theme === 'dark' ? '#A8E6CF' : '#4A90E2',
+                          selectedDayTextColor: theme === 'dark' ? '#333' : '#fff',
+                          todayTextColor: colors.tint,
+                          dayTextColor: colors.text,
+                          textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                          dotColor: 'transparent',
+                          arrowColor: colors.text,
+                          monthTextColor: 'transparent',
+                          indicatorColor: colors.tint,
+                          textDayFontWeight: 'bold',
+                          textDayFontSize: 18,
+                          textMonthFontSize: 18,
+                          textMonthFontWeight: 'bold',
+                          textDayHeaderFontSize: 14,
+                          textDayHeaderFontWeight: '600',
+                        }}
+                        dayComponent={({ date, state, marking }) => (
+                          <CalendarDay
+                            date={date}
+                            state={state}
+                            marking={marking}
+                            theme={{
+                              textDisabledColor: theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                              todayTextColor: colors.tint,
+                              dayTextColor: colors.text,
+                              textDayFontSize: 18
+                            }}
+                          />
+                        )}
+                        hideExtraDays={false}
+                        disableAllTouchEventsForDisabledDays={true}
+                        disableAllTouchEventsForInactiveDays={true}
+                        hideArrows={true}
+                        hideDayNames={true}
+                      />
                     </View>
                   );
                 }}
@@ -325,23 +457,7 @@ export default function DashboardScreen() {
             </View>
           </View>
         </Modal>
-        {/* Disconnect Wallet Button */}
-        <View style={[styles.disconnectButtonContainerFixed, { marginBottom: insets.bottom + 16 }]}> 
-          <TouchableOpacity 
-            style={[
-              styles.disconnectButton, 
-              { 
-                backgroundColor: theme === 'dark' ? colors.tint + '20' : '#4A90E2',
-                borderColor: colors.icon + '30'
-              }
-            ]}
-            onPress={() => router.push('/dashboard')}
-          >  
-            <Text style={[styles.disconnectText, { color: 'white' }]}>Disconnect Wallet</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
-      <BottomNavBar />
     </View>
   );
 }
@@ -390,24 +506,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 16,
     fontWeight: '500',
-  },
-  disconnectButtonContainerFixed: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 90,
-  },
-  disconnectButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 16,
-    minWidth: 180,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  disconnectText: {
-    fontWeight: 'bold',
-    fontSize: 16,
+    maxWidth: '70%',
   },
   calendarContainer: {
     marginBottom: 24,

@@ -44,14 +44,12 @@ class ChatService {
         return [];
       }
 
-      // Get both blockchain interactions and vault interactions
-      const [interactedAddresses, receivedVaults, sentVaults] = await Promise.all([
-        blockscoutService.getInteractedAddresses(currentAddress),
+      // Get both received and sent vaults
+      const [receivedVaults, sentVaults] = await Promise.all([
         vaultService.getReceivedVaults(),
         vaultService.getSentVaults()
       ]);
 
-      console.log(`📊 Found ${interactedAddresses.length} blockchain interactions`);
       console.log(`📥 Found ${receivedVaults.length} received vaults`);
       console.log(`📤 Found ${sentVaults.length} sent vaults`);
 

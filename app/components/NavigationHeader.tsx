@@ -197,7 +197,7 @@ export const NavigationHeader = () => {
     if (!isConnected) return colors.icon;
     if (!isOnFlowTestnet) return '#ff6b6b'; // Red for wrong network
     if (!isRegistered) return '#17a2b8'; // Blue for connected but no username
-    return '#28a745'; // Green for fully set up
+    return '#2E8B57'; // Green for fully set up
   };
 
   const getWalletIcon = () => {
@@ -230,9 +230,8 @@ export const NavigationHeader = () => {
       </>
     );
   };
-
   return (    <View style={[styles.header, { 
-      paddingTop: insets.top,
+      paddingTop: Math.max(insets.top + 8, 20),
       backgroundColor: colors.background 
     }]}>      <TouchableOpacity 
         style={styles.leftButton}
@@ -498,26 +497,44 @@ export const NavigationHeader = () => {
 
 const styles = StyleSheet.create({
   header: {
+    minHeight: 40,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 0,
+    position: 'relative',
+    marginTop: 70,
   },
   leftButton: {
+    position: 'absolute',
+    left: 16,
+    top: '50%',
+    transform: [{ translateY: -22 }],
     padding: 8,
     width: 44,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
   title: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '50%',
+    transform: [{ translateY: -12 }],
     fontSize: 20,
     fontWeight: 'bold',
-    flex: 1,
     textAlign: 'center',
+    zIndex: 1,
   },
   walletButton: {
+    position: 'absolute',
+    right: 16,
+    top: '50%',
+    transform: [{ translateY: -22 }],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -528,6 +545,7 @@ const styles = StyleSheet.create({
     gap: 6,
     minWidth: 44,
     height: 44,
+    zIndex: 2,
   },
   walletText: {
     fontSize: 12,

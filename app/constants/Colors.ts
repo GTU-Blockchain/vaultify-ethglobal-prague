@@ -4,7 +4,7 @@
  */
 
 const tintColorLight = '#2E8B57'; // Sea Green
-const tintColorDark = '#00FF7F'; // Spring Green
+const tintColorDark = '#1756A3'; // Spring Green
 
 export const Colors = {
   light: {
@@ -20,8 +20,8 @@ export const Colors = {
   dark: {
     text: '#E0FFFF', // Light Cyan
     background: '#0A192F', // Dark Navy Blue
-    tint:'rgba(10, 209, 110, 0.79)', // Light Sea Green
-    icon: '#00FF7F', // Spring Green
+    tint:'#8AAFDE', // Light Sea Green
+    icon:'rgb(86, 158, 230)', // Spring Green
     tabIconDefault: '#20B2AA', // Light Sea Green
     tabIconSelected: tintColorDark,
       error: '#FFA5A5', // Pastel Red
