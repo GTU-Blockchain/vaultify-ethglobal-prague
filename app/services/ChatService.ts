@@ -36,7 +36,7 @@ class ChatService {
    */
   async getContacts(): Promise<ChatContact[]> {
     try {
-      console.log('📱 Getting chat contacts from blockchain interactions...');
+      console.log('📱 Getting chat contacts from vault interactions...');
       
       const currentAddress = walletConnectService.getCurrentAddress();
       if (!currentAddress) {
@@ -44,64 +44,81 @@ class ChatService {
         return [];
       }
 
-      // Get interacted addresses from Blockscout
-      const interactedAddresses = await blockscoutService.getInteractedAddresses(currentAddress);
-      console.log(`📊 Found ${interactedAddresses.length} interacted addresses`);
+      // Get both received and sent vaults
+      const [receivedVaults, sentVaults] = await Promise.all([
+        vaultService.getReceivedVaults(),
+        vaultService.getSentVaults()
+      ]);
 
-      // Convert to chat contacts and resolve usernames
-      const contacts: ChatContact[] = [];
-      
-      for (const address of interactedAddresses) {
+      console.log(`📥 Found ${receivedVaults.length} received vaults`);
+      console.log(`📤 Found ${sentVaults.length} sent vaults`);
+
+      // Create a map to store unique contacts
+      const contactMap = new Map<string, ChatContact>();
+
+      // Process received vaults first
+      for (const vault of receivedVaults) {
         try {
-          console.log(`👤 Resolving username for address: ${address.address}`);
-          
-          // Try to resolve username for this specific address
-          const username = await vaultService.getUsernameByAddress(address.address);
-          console.log(`📋 Username result for ${address.address}:`, username);
-          
-          const contact: ChatContact = {
-            id: address.address,
-            username: username || undefined,
-            address: address.address,
-            transactionCount: address.transactionCount,
-            totalValue: address.totalValue,
-            isIncoming: address.isIncoming,
-            isOutgoing: address.isOutgoing,
-            formattedAddress: blockscoutService.formatAddress(address.address),
-            formattedLastInteraction: blockscoutService.formatTimestamp(address.lastInteraction),
-            lastMessageTime: address.lastInteraction
-          };
+          const senderAddress = await vaultService.getAddressByUsername(vault.senderUsername);
+          if (!senderAddress) continue;
 
-          contacts.push(contact);
-          
-          if (username) {
-            console.log(`✅ Resolved username "${username}" for ${address.address}`);
-          } else {
-            console.log(`📝 No username found for ${address.address}`);
-          }
-          
+          const contact: ChatContact = {
+            id: senderAddress,
+            username: vault.senderUsername,
+            address: senderAddress,
+            transactionCount: 1,
+            totalValue: vault.flowAmount,
+            isIncoming: true,
+            isOutgoing: false,
+            formattedAddress: blockscoutService.formatAddress(senderAddress),
+            formattedLastInteraction: blockscoutService.formatTimestamp(vault.createdAt.toString()),
+            lastMessageTime: new Date(vault.createdAt * 1000).toISOString()
+          };
+          contactMap.set(senderAddress.toLowerCase(), contact);
         } catch (error) {
-          console.log(`⚠️ Error processing address ${address.address}:`, error);
-          
-          // Add contact without username
-          const contact: ChatContact = {
-            id: address.address,
-            username: undefined,
-            address: address.address,
-            transactionCount: address.transactionCount,
-            totalValue: address.totalValue,
-            isIncoming: address.isIncoming,
-            isOutgoing: address.isOutgoing,
-            formattedAddress: blockscoutService.formatAddress(address.address),
-            formattedLastInteraction: blockscoutService.formatTimestamp(address.lastInteraction),
-            lastMessageTime: address.lastInteraction
-          };
-
-          contacts.push(contact);
+          console.log(`⚠️ Error processing received vault from ${vault.senderUsername}:`, error);
         }
       }
 
-      console.log(`✅ Processed ${contacts.length} chat contacts`);
+      // Process sent vaults
+      for (const vault of sentVaults) {
+        try {
+          const recipientAddress = await vaultService.getAddressByUsername(vault.recipientUsername);
+          if (!recipientAddress) continue;
+
+          const existingContact = contactMap.get(recipientAddress.toLowerCase());
+          if (existingContact) {
+            // Update existing contact with vault info
+            existingContact.transactionCount += 1;
+            existingContact.lastMessageTime = new Date(vault.createdAt * 1000).toISOString();
+            existingContact.formattedLastInteraction = blockscoutService.formatTimestamp(vault.createdAt.toString());
+            existingContact.isOutgoing = true;
+          } else {
+            // Create new contact from vault
+            const contact: ChatContact = {
+              id: recipientAddress,
+              username: vault.recipientUsername,
+              address: recipientAddress,
+              transactionCount: 1,
+              totalValue: vault.flowAmount,
+              isIncoming: false,
+              isOutgoing: true,
+              formattedAddress: blockscoutService.formatAddress(recipientAddress),
+              formattedLastInteraction: blockscoutService.formatTimestamp(vault.createdAt.toString()),
+              lastMessageTime: new Date(vault.createdAt * 1000).toISOString()
+            };
+            contactMap.set(recipientAddress.toLowerCase(), contact);
+          }
+        } catch (error) {
+          console.log(`⚠️ Error processing sent vault to ${vault.recipientUsername}:`, error);
+        }
+      }
+
+      // Convert map to array and sort by last interaction
+      const contacts = Array.from(contactMap.values());
+      contacts.sort((a, b) => new Date(b.lastMessageTime || '0').getTime() - new Date(a.lastMessageTime || '0').getTime());
+
+      console.log(`✅ Processed ${contacts.length} total chat contacts`);
       return contacts;
 
     } catch (error: any) {
