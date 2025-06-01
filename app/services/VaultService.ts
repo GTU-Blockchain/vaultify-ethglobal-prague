@@ -350,17 +350,9 @@ class VaultService {
         throw new Error('Wallet not connected.');
       }
 
-      console.log('✅ Validation passed');
-
-      // Check if user has registered username
-      console.log('👤 Checking if username is registered...');
+      console.log('✅ Validation passed');      // Get current address to use in metadata
       const currentUsername = await this.getCurrentUsername();
-      
-      if (!currentUsername) {
-        throw new Error('You must register a username before creating vaults. Please register a username first.');
-      }
-      
-      console.log('✅ Username verified:', currentUsername);
+      console.log('👤 Current username:', currentUsername);
 
       // Get recipient username (if exists) or use address
       let recipientUsername = params.recipientAddress;

@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useWalletConnect } from '../../hooks/useWalletConnect';
 import { BottomNavBar } from '../components/BottomNavBar';
 import { useTheme } from '../context/ThemeContext';
 import { vaultService } from '../services/VaultService';
@@ -16,8 +17,21 @@ import { walletConnectService } from '../services/WalletConnectService';
 export default function CameraScreen() {
   const { username: routeUsername } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
+
+  // WalletConnect integration
+  const {
+    isConnected,
+    isRegistered,
+    isOnFlowTestnet,
+    error: walletError,
+    connect,
+    switchToFlowTestnet,
+    registerUsername,
+  } = useWalletConnect();
+
+  // Media state
   const [media, setMedia] = useState<{ uri: string; type: 'photo' | 'video' } | null>(null);
   const [showVaultModal, setShowVaultModal] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
@@ -32,7 +46,7 @@ export default function CameraScreen() {
   
   // Username registration state
   const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [username, setUsername] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   const [isRegisteringUsername, setIsRegisteringUsername] = useState(false);
   
   // Camera state
@@ -46,8 +60,6 @@ export default function CameraScreen() {
   const cameraRef = useRef<any>(null);
   const videoRef = useRef<any>(null);
   const longPressTimer = useRef<number | null>(null);
-
-  const { theme } = useTheme();
 
   React.useEffect(() => {
     requestPermission();
@@ -251,19 +263,9 @@ export default function CameraScreen() {
       return;
     }
 
-    setIsCreatingVault(true);
-
-    try {
-      // Check if user has registered username
-      const currentUsername = await vaultService.getCurrentUsername();
-      
-      if (!currentUsername) {
-        setIsCreatingVault(false);
-        setShowVaultModal(false);
-        setShowUsernameModal(true);
-        return;
-      }
-
+    setIsCreatingVault(true);    try {
+      // Since we already check isRegistered in the main render condition,
+      // we don't need to check username again here
       const result = await vaultService.createVault({
         vaultName: vaultName.trim(),
         unlockDate,
@@ -308,12 +310,12 @@ export default function CameraScreen() {
   };
 
   const handleRegisterUsername = async () => {
-    if (!username.trim()) {
+    if (!usernameInput.trim()) {
       handleError('Username is required');
       return;
     }
 
-    if (username.length < 3 || username.length > 20) {
+    if (usernameInput.length < 3 || usernameInput.length > 20) {
       handleError('Username must be between 3 and 20 characters');
       return;
     }
@@ -321,9 +323,9 @@ export default function CameraScreen() {
     setIsRegisteringUsername(true);
 
     try {
-      await vaultService.registerUsername(username.trim());
+      await vaultService.registerUsername(usernameInput.trim());
       setShowUsernameModal(false);
-      setUsername('');
+      setUsernameInput('');
       setShowVaultModal(true); // Go back to vault creation
       
       Alert.alert(
@@ -387,6 +389,61 @@ export default function CameraScreen() {
     return (
       <View style={styles.container}>
         <Text style={[styles.errorText, { color: colors.text }]}>No access to camera</Text>
+      </View>
+    );
+  }
+
+  // If not connected or not registered, show appropriate UI
+  if (!isConnected || !isOnFlowTestnet || !isRegistered) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <Ionicons
+            name={!isConnected ? "wallet-outline" : !isOnFlowTestnet ? "warning-outline" : "person-add-outline"}
+            size={64}
+            color={colors.text + '60'}
+          />
+          <Text style={[styles.title, { color: colors.text }]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          >
+            {!isConnected ? "Connect Your Wallet" :
+             !isOnFlowTestnet ? "Wrong Network" :
+             "Register Username"}
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.text + '80' }]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          >
+            {!isConnected ? "Please connect your wallet to continue" :
+             !isOnFlowTestnet ? "Please switch to Flow Testnet" :
+             "Register a username to start using Vaultify"}
+          </Text>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.tint }]}
+            onPress={async () => {
+              try {
+                if (!isConnected) {
+                  await connect();
+                } else if (!isOnFlowTestnet) {
+                  await switchToFlowTestnet();
+                } else {
+                  setShowUsernameModal(true);
+                }
+              } catch (error) {
+                console.error('Action failed:', error);
+                Alert.alert('Error', error instanceof Error ? error.message : 'Operation failed');
+              }
+            }}
+          >
+            <Text style={[styles.actionButtonText, { color: colors.background }]}>
+              {!isConnected ? "Connect Wallet" :
+               !isOnFlowTestnet ? "Switch Network" :
+               "Register Username"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <BottomNavBar />
       </View>
     );
   }
@@ -835,8 +892,8 @@ export default function CameraScreen() {
                   color: theme === 'dark' ? colors.text : '#1B3B4B',
                   borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
                 }]}
-                value={username}
-                onChangeText={setUsername}
+                value={usernameInput}
+                onChangeText={setUsernameInput}
                 placeholder="Enter username (3-20 characters)"
                 placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
                 autoCapitalize="none"
@@ -1128,5 +1185,34 @@ const styles = StyleSheet.create({
   modalValue: {
     fontSize: 16,
     fontWeight: '400',
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  actionButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
