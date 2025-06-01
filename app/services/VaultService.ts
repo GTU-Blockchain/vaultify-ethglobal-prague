@@ -362,6 +362,24 @@ class VaultService {
       
       console.log('✅ Username verified:', currentUsername);
 
+      // Get recipient username (if exists) or use address
+      let recipientUsername = params.recipientAddress;
+      try {
+        console.log('🔍 Checking recipient address:', params.recipientAddress);
+        const username = await this.getUsernameByAddress(params.recipientAddress);
+        console.log('🔍 Username lookup result:', username);
+        
+        if (username && username !== '') {
+          recipientUsername = username;
+          console.log('👤 Found recipient username:', username);
+        } else {
+          console.log('👤 Recipient not registered, using address as username');
+        }
+      } catch (error) {
+        console.log('👤 Error checking recipient address:', error);
+        console.log('👤 Using address as recipient username anyway');
+      }
+
       // Calculate unlock timestamp with proper validation
       console.log('📅 Input unlock date:', params.unlockDate);
       
@@ -450,33 +468,12 @@ class VaultService {
       console.log('💰 Transaction params:', {
         flowAmount: params.flowAmount,
         flowAmountWei: flowAmountWei.toString(),
-        unlockDelaySeconds
+        unlockDelaySeconds,
+        senderUsername: currentUsername,
+        recipientUsername: recipientUsername
       });
 
-      // Get recipient username (if exists) or use address
-      let recipientUsername = params.recipientAddress;
-      try {
-        console.log('🔍 Checking recipient address:', params.recipientAddress);
-        const username = await contract.getUsernameByAddress(params.recipientAddress);
-        console.log('🔍 Username lookup result:', username);
-        
-        if (username && username !== '') {
-          recipientUsername = username;
-          console.log('👤 Found recipient username:', username);
-        } else {
-          console.log('👤 Recipient not registered, using address as username');
-          
-          // Check if smart contract requires recipient to be registered
-          console.log('⚠️ Warning: Recipient address is not registered. Some smart contracts may require this.');
-        }
-      } catch (error) {
-        console.log('👤 Error checking recipient address:', error);
-        console.log('👤 Using address as recipient username anyway');
-      }
-
       // Send transaction using our custom method
-      // Use metadata hash as IPFS CID
-      
       console.log('📡 Sending vault transaction...');
       console.log('📡 Transaction details:', {
         recipientUsername,
@@ -486,41 +483,9 @@ class VaultService {
         metadataHash,
         messageLength: params.content.length,
         unlockDelaySeconds,
-        flowAmountWei: flowAmountWei.toString()
+        flowAmountWei: flowAmountWei.toString(),
+        senderUsername: currentUsername
       });
-      
-      // Additional validation before sending transaction
-      console.log('🔍 Pre-transaction validation:');
-      console.log('  - Recipient username length:', recipientUsername.length);
-      console.log('  - Metadata hash length:', metadataHash.length);
-      console.log('  - Message length:', params.content.length);
-      console.log('  - Unlock delay (seconds):', unlockDelaySeconds);
-      console.log('  - Flow amount (Wei):', flowAmountWei.toString());
-      console.log('  - Current address:', currentAddress);
-      
-      // Check for potential issues
-      console.log('🔍 Pre-transaction validation:');
-      console.log('  - Recipient username length:', recipientUsername.length);
-      console.log('  - Metadata hash length:', metadataHash.length);
-      console.log('  - Message length:', params.content.length);
-      console.log('  - Unlock delay (seconds):', unlockDelaySeconds);
-      console.log('  - Flow amount (Wei):', flowAmountWei.toString());
-      console.log('  - Current address:', currentAddress);
-      
-      // Check for potential issues
-      if (unlockDelaySeconds <= 0) {
-        throw new Error(`Invalid unlock delay: ${unlockDelaySeconds} seconds. Must be positive.`);
-      }
-      
-      if (!metadataHash || metadataHash.length < 10) {
-        throw new Error(`Invalid metadata hash: ${metadataHash}`);
-      }
-      
-      if (flowAmountWei <= 0) {
-        throw new Error(`Invalid flow amount: ${flowAmountWei.toString()}`);
-      }
-      
-      console.log('✅ Pre-transaction validation passed');
       
       const receipt = await this.sendContractTransaction(
         contract,
@@ -545,6 +510,12 @@ class VaultService {
           if (parsed && parsed.name === 'SnapSent') {
             vaultId = Number(parsed.args.snapId);
             console.log('🆔 Vault ID extracted:', vaultId);
+            console.log('📦 Vault details from event:', {
+              snapId: parsed.args.snapId,
+              senderUsername: parsed.args.senderUsername,
+              recipientUsername: parsed.args.recipientUsername,
+              snapType: parsed.args.snapType
+            });
             break;
           }
         } catch (error) {
@@ -554,7 +525,9 @@ class VaultService {
 
       console.log('🎉 Vault created successfully:', {
         vaultId,
-        transactionHash: receipt.hash
+        transactionHash: receipt.hash,
+        senderUsername: currentUsername,
+        recipientUsername: recipientUsername
       });
 
       return {
@@ -599,8 +572,7 @@ class VaultService {
         throw new Error('Wallet not connected. Please connect your wallet first.');
       }
       
-      // Generic error with original message for debugging
-      throw new Error(`Failed to create vault: ${errorMessage}`);
+      throw error;
     }
   }
 
@@ -755,6 +727,76 @@ class VaultService {
    */
   getMediaUrl(ipfsHash: string): string {
     return ipfsService.getMediaUrl(ipfsHash);
+  }
+
+  /**
+   * Get sent vaults for current user
+   */
+  async getSentVaults(): Promise<VaultData[]> {
+    try {
+      const contract = await this.getContract();
+      const address = walletConnectService.getCurrentAddress();
+      
+      if (!address) {
+        console.log('❌ No wallet address found');
+        return [];
+      }
+
+      // Get current username
+      const currentUsername = await this.getCurrentUsername();
+      console.log('👤 Current username:', currentUsername);
+      
+      if (!currentUsername) {
+        console.log('❌ No username found for current address');
+        return [];
+      }
+
+      // Convert username to lowercase for comparison
+      const lowerCurrentUsername = currentUsername.toLowerCase();
+      console.log('👤 Lowercase username for comparison:', lowerCurrentUsername);
+
+      // Get the next snap ID to know how many vaults to check
+      const nextId = await contract.nextSnapId();
+      console.log('📊 Total vaults to check:', nextId - 1);
+      
+      const vaults: VaultData[] = [];
+
+      // Iterate through all vaults to find ones sent by current user
+      for (let i = 1; i < nextId; i++) {
+        try {
+          console.log(`🔍 Checking vault ${i}...`);
+          const vaultData = await this.getVault(i);
+          
+          if (vaultData) {
+            const lowerSenderUsername = vaultData.senderUsername.toLowerCase();
+            console.log(`📦 Vault ${i} data:`, {
+              senderUsername: vaultData.senderUsername,
+              lowerSenderUsername,
+              recipientUsername: vaultData.recipientUsername,
+              currentUsername: currentUsername,
+              lowerCurrentUsername,
+              matches: lowerSenderUsername === lowerCurrentUsername
+            });
+            
+            if (lowerSenderUsername === lowerCurrentUsername) {
+              console.log(`✅ Found sent vault ${i}`);
+              vaults.push(vaultData);
+            }
+          }
+        } catch (error) {
+          console.log(`⚠️ Error checking vault ${i}:`, error);
+          // Skip invalid vaults
+          continue;
+        }
+      }
+
+      console.log(`🎯 Found ${vaults.length} sent vaults`);
+      return vaults.sort((a, b) => b.createdAt - a.createdAt); // Sort by newest first
+
+    } catch (error) {
+      console.error('❌ Error getting sent vaults:', error);
+      return [];
+    }
   }
 }
 
