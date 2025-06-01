@@ -143,19 +143,32 @@ export default function CameraScreen() {
       try {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
-          skipProcessing: true,
+          skipProcessing: false,
           exif: false,
-          base64: false
+          base64: false,
+          format: 'jpeg'
+        });
+        
+        console.log('📸 Photo taken:', {
+          uri: photo.uri,
+          width: photo.width,
+          height: photo.height
         });
         
         if (cameraType === 'front') {
           const manipulatedImage = await ImageManipulator.manipulateAsync(
             photo.uri,
             [{ flip: ImageManipulator.FlipType.Horizontal }],
-            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+            { 
+              compress: 0.8, 
+              format: ImageManipulator.SaveFormat.JPEG,
+              base64: false
+            }
           );
+          console.log('📸 Front camera image manipulated:', manipulatedImage.uri);
           setMedia({ uri: manipulatedImage.uri, type: 'photo' });
         } else {
+          console.log('📸 Back camera image set:', photo.uri);
           setMedia({ uri: photo.uri, type: 'photo' });
         }
       } catch (error) {

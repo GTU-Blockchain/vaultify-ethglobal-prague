@@ -445,18 +445,7 @@ class VaultService {
       let mediaHash: string | undefined;
       let metadataHash: string | undefined;
 
-      // Upload media to IPFS if provided
-      if (params.mediaUri && params.mediaType) {
-        console.log('📸 Uploading media to IPFS...');
-        const fileName = `vault-media-${Date.now()}.${params.mediaType === 'photo' ? 'jpg' : 'mp4'}`;
-        const mediaResult = await ipfsService.uploadMedia(params.mediaUri, fileName);
-        mediaHash = mediaResult.hash;
-        console.log('✅ Media uploaded to IPFS:', mediaHash);
-      } else {
-        console.log('ℹ️ No media to upload');
-      }
-
-      // Create comprehensive metadata
+      // Create comprehensive metadata first
       const metadata: VaultMetadata = {
         vaultName: params.vaultName,
         unlockDate: params.unlockDate,
@@ -466,17 +455,28 @@ class VaultService {
         flowAmount: params.flowAmount,
         createdAt: new Date().toISOString(),
         creatorAddress: currentAddress,
-        mediaHash: mediaHash || null,
+        mediaHash: null, // Will be set by uploadVault
         mediaType: params.mediaType || null
       };
 
-      console.log('📝 Uploading metadata to IPFS...');
+      console.log('📸 Uploading vault (media + metadata) to IPFS...');
       
-      // Upload metadata to IPFS
-      const metadataResult = await ipfsService.uploadMetadata(metadata);
-      metadataHash = metadataResult.hash;
+      // Use uploadVault method to handle both media and metadata upload properly
+      const uploadResult = await ipfsService.uploadVault(
+        params.mediaUri || null,
+        params.mediaType || null,
+        metadata
+      );
       
-      console.log('✅ Metadata uploaded to IPFS:', metadataHash);
+      mediaHash = uploadResult.mediaHash;
+      metadataHash = uploadResult.metadataHash;
+      
+      console.log('✅ Vault upload completed:', {
+        mediaHash,
+        metadataHash,
+        mediaUrl: uploadResult.mediaUrl,
+        metadataUrl: uploadResult.metadataUrl
+      });
 
       // Get contract and prepare transaction
       const contract = await this.getContract();
@@ -717,35 +717,166 @@ class VaultService {
   }
 
   /**
-   * Check if vault can be opened
+   * Check if current user is the sender of a vault
    */
-  async canOpenVault(vaultId: number): Promise<boolean> {
+  async isVaultSender(vaultId: number): Promise<boolean> {
     try {
-      const contract = await this.getContract();
-      return await contract.canOpenSnap(vaultId);
+      const currentAddress = walletConnectService.getCurrentAddress();
+      if (!currentAddress) {
+        console.log('🚫 isVaultSender: No current address');
+        return false;
+      }
+
+      const vaultData = await this.getVault(vaultId);
+      if (!vaultData) {
+        console.log('🚫 isVaultSender: No vault data found');
+        return false;
+      }
+
+      console.log(`🔍 isVaultSender for vault ${vaultId}:`, {
+        currentAddress: currentAddress.toLowerCase(),
+        vaultSenderUsername: vaultData.senderUsername
+      });
+
+      // Get sender's address by username
+      const senderAddress = await this.getAddressByUsername(vaultData.senderUsername);
+      console.log(`🔍 Sender address lookup result:`, {
+        senderUsername: vaultData.senderUsername,
+        senderAddress: senderAddress?.toLowerCase(),
+        currentAddress: currentAddress.toLowerCase(),
+        matches: senderAddress?.toLowerCase() === currentAddress.toLowerCase()
+      });
+      
+      if (!senderAddress) {
+        console.log('🚫 isVaultSender: Could not resolve sender address');
+        return false;
+      }
+
+      const isMatch = senderAddress.toLowerCase() === currentAddress.toLowerCase();
+      console.log(`✅ isVaultSender result: ${isMatch}`);
+      
+      return isMatch;
+
     } catch (error) {
-      console.error('Error checking if vault can be opened:', error);
+      console.error('❌ Error checking if user is vault sender:', error);
       return false;
     }
   }
 
   /**
-   * Get vault metadata from IPFS
+   * Check if current user is the recipient of a vault
    */
-  async getVaultMetadata(ipfsHash: string): Promise<VaultMetadata | null> {
+  async isVaultRecipient(vaultId: number): Promise<boolean> {
     try {
-      return await ipfsService.getMetadata(ipfsHash);
+      const currentAddress = walletConnectService.getCurrentAddress();
+      if (!currentAddress) {
+        return false;
+      }
+
+      const vaultData = await this.getVault(vaultId);
+      if (!vaultData) {
+        return false;
+      }
+
+      // Get recipient address from smart contract
+      const contract = await this.getContract();
+      const snapData = await contract.getSnapData(vaultId);
+      
+      // Get recipient's address by username
+      const recipientAddress = await this.getAddressByUsername(snapData.recipientUsername);
+      
+      return recipientAddress?.toLowerCase() === currentAddress.toLowerCase();
+
     } catch (error) {
-      console.error('Error getting vault metadata:', error);
-      return null;
+      console.error('Error checking if user is vault recipient:', error);
+      return false;
     }
   }
 
   /**
-   * Get media URL from IPFS hash
+   * Check if vault can be accessed (opened for viewing content)
+   * - Senders can always access their sent vaults
+   * - Recipients can only access after unlock time
    */
-  getMediaUrl(ipfsHash: string): string {
-    return ipfsService.getMediaUrl(ipfsHash);
+  async canAccessVault(vaultId: number): Promise<{
+    canAccess: boolean;
+    reason: 'sender' | 'unlocked' | 'locked' | 'not_authorized';
+    unlockDate?: Date;
+  }> {
+    try {
+      const currentAddress = walletConnectService.getCurrentAddress();
+      if (!currentAddress) {
+        return { canAccess: false, reason: 'not_authorized' };
+      }
+
+      const vaultData = await this.getVault(vaultId);
+      if (!vaultData) {
+        return { canAccess: false, reason: 'not_authorized' };
+      }
+
+      // Try both methods to check if user is sender
+      const isSenderByAddress = await this.isVaultSender(vaultId);
+      const isSenderByUsername = await this.isVaultSenderByUsername(vaultId);
+      
+      console.log(`🔍 Sender check results for vault ${vaultId}:`, {
+        isSenderByAddress,
+        isSenderByUsername,
+        finalIsSender: isSenderByAddress || isSenderByUsername
+      });
+
+      if (isSenderByAddress || isSenderByUsername) {
+        console.log(`✅ User is sender of vault ${vaultId}`);
+        return { canAccess: true, reason: 'sender' };
+      }
+
+      // Check if user is recipient
+      const isRecipient = await this.isVaultRecipient(vaultId);
+      if (!isRecipient) {
+        return { canAccess: false, reason: 'not_authorized' };
+      }
+
+      // For recipients, check unlock time
+      const unlockDate = new Date(vaultData.unlockAt * 1000);
+      const now = new Date();
+
+      if (now >= unlockDate) {
+        return { canAccess: true, reason: 'unlocked', unlockDate };
+      } else {
+        return { canAccess: false, reason: 'locked', unlockDate };
+      }
+
+    } catch (error) {
+      console.error('Error checking vault access:', error);
+      return { canAccess: false, reason: 'not_authorized' };
+    }
+  }
+
+  /**
+   * Check if vault can be opened (for blockchain transaction)
+   * - Recipients can open vaults that are unlocked and not already opened
+   * - Senders cannot open their own sent vaults (they don't receive the funds)
+   */
+  async canOpenVault(vaultId: number): Promise<boolean> {
+    try {
+      const accessInfo = await this.canAccessVault(vaultId);
+      
+      // Only recipients can "open" vaults to receive funds
+      // Senders can access content but don't need to "open" 
+      if (accessInfo.reason === 'sender') {
+        return false; // Senders don't open their own vaults
+      }
+      
+      if (accessInfo.reason === 'unlocked') {
+        // Check with smart contract if it's actually openable
+        const contract = await this.getContract();
+        return await contract.canOpenSnap(vaultId);
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking if vault can be opened:', error);
+      return false;
+    }
   }
 
   /**
@@ -820,49 +951,55 @@ class VaultService {
   }
 
   /**
-   * Get detailed vault information including metadata and media
+   * Get vault metadata from IPFS
    */
-  async getVaultDetails(vaultId: number): Promise<VaultDetails | null> {
+  async getVaultMetadata(ipfsHash: string): Promise<VaultMetadata | null> {
     try {
-      console.log('🔍 Getting vault details for ID:', vaultId);
-      
-      // Get basic vault data
+      return await ipfsService.getMetadata(ipfsHash);
+    } catch (error) {
+      console.error('Error getting vault metadata:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get media URL from IPFS hash
+   */
+  getMediaUrl(ipfsHash: string): string {
+    return ipfsService.getMediaUrl(ipfsHash);
+  }
+
+  /**
+   * Check if current user is the sender of a vault (alternative method using username comparison)
+   */
+  async isVaultSenderByUsername(vaultId: number): Promise<boolean> {
+    try {
+      const currentUsername = await this.getCurrentUsername();
+      if (!currentUsername) {
+        console.log('🚫 isVaultSenderByUsername: No current username');
+        return false;
+      }
+
       const vaultData = await this.getVault(vaultId);
       if (!vaultData) {
-        console.log('❌ Vault not found');
-        return null;
+        console.log('🚫 isVaultSenderByUsername: No vault data found');
+        return false;
       }
 
-      console.log('📦 Basic vault data:', vaultData);
+      console.log(`🔍 isVaultSenderByUsername for vault ${vaultId}:`, {
+        currentUsername: currentUsername.toLowerCase(),
+        vaultSenderUsername: vaultData.senderUsername.toLowerCase(),
+        matches: currentUsername.toLowerCase() === vaultData.senderUsername.toLowerCase()
+      });
 
-      // Get metadata from IPFS
-      const metadata = await this.getVaultMetadata(vaultData.ipfsCID);
-      console.log('📝 Vault metadata:', metadata);
-
-      // Construct media URL if available
-      let mediaUrl: string | undefined;
-      if (metadata?.mediaHash) {
-        console.log('📸 Media hash found:', metadata.mediaHash);
-        // Use ipfsService to get the media URL from the mediaHash
-        mediaUrl = ipfsService.getMediaUrl(metadata.mediaHash);
-        console.log('🔗 Media URL constructed:', mediaUrl);
-      } else {
-        console.log('ℹ️ No media hash found in metadata');
-      }
-
-      const details = {
-        ...vaultData,
-        metadata: metadata || undefined,
-        mediaUrl,
-        mediaType: metadata?.mediaType || undefined
-      };
-
-      console.log('✅ Final vault details:', details);
-      return details;
+      const isMatch = currentUsername.toLowerCase() === vaultData.senderUsername.toLowerCase();
+      console.log(`✅ isVaultSenderByUsername result: ${isMatch}`);
+      
+      return isMatch;
 
     } catch (error) {
-      console.error('❌ Error getting vault details:', error);
-      return null;
+      console.error('❌ Error checking if user is vault sender by username:', error);
+      return false;
     }
   }
 }
