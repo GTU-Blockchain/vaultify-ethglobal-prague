@@ -6,31 +6,45 @@ import * as MediaLibrary from 'expo-media-library';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
-import { Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavBar } from '../components/BottomNavBar';
-import { Colors } from '../constants/Colors';
 import { useTheme } from '../context/ThemeContext';
+import { vaultService } from '../services/VaultService';
+import { walletConnectService } from '../services/WalletConnectService';
 
 export default function CameraScreen() {
   const { username: routeUsername } = useLocalSearchParams();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [media, setMedia] = useState<{ uri: string; type: 'photo' | 'video' } | null>(null);
   const [showVaultModal, setShowVaultModal] = useState(false);
-  const [username, setUsername] = useState(routeUsername ? String(routeUsername) : '');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [isCreatingVault, setIsCreatingVault] = useState(false);
+  
+  // Form state
+  const [vaultName, setVaultName] = useState('');
+  const [unlockDate, setUnlockDate] = useState('');
+  const [content, setContent] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState(routeUsername ? String(routeUsername) : '');
+  const [flowAmount, setFlowAmount] = useState('');
+  
+  // Username registration state
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [username, setUsername] = useState('');
+  const [isRegisteringUsername, setIsRegisteringUsername] = useState(false);
+  
+  // Camera state
   const [cameraType, setCameraType] = useState<'front' | 'back'>('back');
   const [isRecording, setIsRecording] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [hasStartedRecording, setHasStartedRecording] = useState(false);
   const [isVideoMode, setIsVideoMode] = useState(false);
+  
+  // Refs
   const cameraRef = useRef<any>(null);
   const videoRef = useRef<any>(null);
-
   const longPressTimer = useRef<number | null>(null);
 
   const { theme } = useTheme();
@@ -49,6 +63,66 @@ export default function CameraScreen() {
       setIsRecording(false);
     }
   }, [media]);
+
+  const handleError = (message: string) => {
+    Alert.alert(
+      'Error',
+      message,
+      [{ text: 'OK', onPress: () => {} }]
+    );
+  };
+
+  const validateForm = (): boolean => {
+    if (!vaultName.trim()) {
+      handleError('Vault name is required');
+      return false;
+    }
+    
+    if (!unlockDate) {
+      handleError('Unlock date is required');
+      return false;
+    }
+    
+    // Validate date format and parse
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(unlockDate)) {
+      handleError('Please enter date in YYYY-MM-DD format');
+      return false;
+    }
+    
+    const selectedDate = new Date(unlockDate + 'T00:00:00'); // Add time to ensure proper parsing
+    if (isNaN(selectedDate.getTime())) {
+      handleError('Invalid date. Please enter a valid date');
+      return false;
+    }
+    
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Reset time to compare dates only
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    if (selectedDate <= now) {
+      handleError('Unlock date must be in the future');
+      return false;
+    }
+    
+    if (!recipientAddress.trim()) {
+      handleError('Recipient wallet address is required');
+      return false;
+    }
+    
+    // Basic Ethereum address validation
+    if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddress.trim())) {
+      handleError('Invalid wallet address format');
+      return false;
+    }
+    
+    if (!flowAmount.trim() || parseFloat(flowAmount) <= 0) {
+      handleError('Flow amount must be greater than 0');
+      return false;
+    }
+    
+    return true;
+  };
 
   const takePhoto = async () => {
     if (cameraRef.current) {
@@ -72,7 +146,7 @@ export default function CameraScreen() {
         }
       } catch (error) {
         console.error('Error taking photo:', error);
-        Alert.alert('Error', 'Failed to take photo. Please try again.');
+        handleError('Failed to take photo. Please try again.');
       }
     }
   };
@@ -98,7 +172,7 @@ export default function CameraScreen() {
         setHasStartedRecording(false);
       } catch (error) {
         console.error('Error during recording:', error);
-        Alert.alert('Error', 'Failed to record video. Please try again.');
+        handleError('Failed to record video. Please try again.');
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
@@ -116,7 +190,7 @@ export default function CameraScreen() {
         setHasStartedRecording(false);
       } catch (error) {
         console.error('Error stopping video:', error);
-        Alert.alert('Error', 'Failed to save video. Please try again.');
+        handleError('Failed to save video. Please try again.');
         setIsRecording(false);
         setIsLongPressing(false);
         setHasStartedRecording(false);
@@ -159,11 +233,111 @@ export default function CameraScreen() {
 
   const handleCancel = () => {
     setMedia(null);
+    // Reset form
+    setVaultName('');
+    setUnlockDate('');
+    setContent('');
+    setRecipientAddress(routeUsername ? String(routeUsername) : '');
+    setFlowAmount('');
   };
 
-  const handleCreateVault = () => {
-    setShowVaultModal(false);
-    router.push('/chat/1');
+  const handleCreateVault = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    if (!walletConnectService.isWalletConnected()) {
+      handleError('Please connect your wallet first');
+      return;
+    }
+
+    setIsCreatingVault(true);
+
+    try {
+      // Check if user has registered username
+      const currentUsername = await vaultService.getCurrentUsername();
+      
+      if (!currentUsername) {
+        setIsCreatingVault(false);
+        setShowVaultModal(false);
+        setShowUsernameModal(true);
+        return;
+      }
+
+      const result = await vaultService.createVault({
+        vaultName: vaultName.trim(),
+        unlockDate,
+        content: content.trim(),
+        recipientAddress: recipientAddress.trim(),
+        flowAmount: flowAmount.trim(),
+        mediaUri: media?.uri,
+        mediaType: media?.type,
+      });
+
+      console.log('Vault created successfully:', result);
+      setShowVaultModal(false);
+      setShowConfirmationModal(true);
+
+    } catch (error: any) {
+      console.error('Error creating vault:', error);
+      
+      // Provide more specific guidance based on error type
+      const errorMessage = error.message || 'Failed to create vault. Please try again.';
+      
+      if (errorMessage.includes('recipient must register') || errorMessage.includes('recipient address is not registered')) {
+        Alert.alert(
+          'Recipient Not Registered',
+          'The recipient address you entered is not registered on the platform. The recipient must register a username before they can receive vaults.\n\nPlease ask them to register first, or use a different address.',
+          [
+            { text: 'Change Address', onPress: () => {} },
+            { text: 'OK', onPress: () => {} }
+          ]
+        );
+      } else if (errorMessage.includes('both sender and recipient must have registered')) {
+        Alert.alert(
+          'Registration Required',
+          'Both you and the recipient must have registered usernames to create vaults.',
+          [{ text: 'OK', onPress: () => {} }]
+        );
+      } else {
+        handleError(errorMessage);
+      }
+    } finally {
+      setIsCreatingVault(false);
+    }
+  };
+
+  const handleRegisterUsername = async () => {
+    if (!username.trim()) {
+      handleError('Username is required');
+      return;
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      handleError('Username must be between 3 and 20 characters');
+      return;
+    }
+
+    setIsRegisteringUsername(true);
+
+    try {
+      await vaultService.registerUsername(username.trim());
+      setShowUsernameModal(false);
+      setUsername('');
+      setShowVaultModal(true); // Go back to vault creation
+      
+      Alert.alert(
+        'Success',
+        'Username registered successfully! Now you can create vaults.',
+        [{ text: 'OK' }]
+      );
+
+    } catch (error: any) {
+      console.error('Error registering username:', error);
+      handleError(error.message || 'Failed to register username. Please try again.');
+    } finally {
+      setIsRegisteringUsername(false);
+    }
   };
 
   const toggleCameraType = () => {
@@ -194,6 +368,18 @@ export default function CameraScreen() {
     }
   };
 
+  // Format date for input (YYYY-MM-DD format)
+  const formatDateForInput = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Get minimum date (tomorrow)
+  const getMinDate = (): string => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return formatDateForInput(tomorrow);
+  };
+
   if (!permission) {
     return <View style={styles.container} />;
   }
@@ -204,7 +390,6 @@ export default function CameraScreen() {
       </View>
     );
   }
-
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -219,12 +404,12 @@ export default function CameraScreen() {
           />
           <TouchableOpacity 
             style={[styles.flipButton, { 
-              top: insets.top + 5,
+              top: 16,
               right: 16
             }]}
             onPress={toggleCameraType}
           >
-            <Ionicons name="camera-reverse" size={24} color={colors.text} />
+            <Ionicons name="camera-reverse" size={24} color={colors.icon} />
           </TouchableOpacity>
           <View style={styles.cameraControls}>
             <TouchableOpacity 
@@ -240,7 +425,6 @@ export default function CameraScreen() {
                 styles.captureButtonInner,
                 isRecording && styles.recordingButtonInner
               ]} />
-              
             </TouchableOpacity>
             <View style={styles.modeIndicator}>
               <TouchableOpacity 
@@ -250,7 +434,6 @@ export default function CameraScreen() {
                 <Text style={[
                   styles.modeText, 
                   { 
-                    color: colors.text,
                     fontWeight: !isVideoMode ? '600' : '400',
                     textShadowColor: theme === 'dark' ? '#000' : '#fff',
                     textShadowOffset: { width: 0.5, height: 0.5 },
@@ -265,7 +448,6 @@ export default function CameraScreen() {
                 <Text style={[
                   styles.modeText, 
                   { 
-                    color: colors.text,
                     fontWeight: isVideoMode ? '600' : '400',
                     textShadowColor: theme === 'dark' ? '#000' : '#fff',
                     textShadowOffset: { width: 0.5, height: 0.5 },
@@ -295,7 +477,7 @@ export default function CameraScreen() {
                   }}
                   onPress={handleSavePhoto}
                 >
-                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Save to Device</Text>
+                  <Text style={styles.buttonText}>Save to Device</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{
@@ -306,7 +488,7 @@ export default function CameraScreen() {
                   }}
                   onPress={handleSharePhoto}
                 >
-                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Share</Text>
+                  <Text style={styles.buttonText}>Share</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -321,9 +503,15 @@ export default function CameraScreen() {
                 isLooping
                 shouldPlay={false}
                 isMuted={false}
-                onError={(error: string) => {
+                onError={(error) => {
                   console.error('Video Error:', error);
-                  Alert.alert('Error', 'Failed to play video. Please try again.');
+                  Alert.alert(
+                    'Video Error',
+                    'Failed to play video. Please try again.',
+                    [
+                      { text: 'OK', onPress: () => {} }
+                    ]
+                  );
                 }}
               />
               <View style={styles.videoControls}>
@@ -341,20 +529,21 @@ export default function CameraScreen() {
             </View>
           )}
           <TouchableOpacity 
-            style={[styles.backButton, { top: insets.top + 10 }]}
+            style={[styles.backButton, { top: 16 }]}
             onPress={handleCancel}
           >
-            <Ionicons name="close" size={24} color={colors.text} />
+            <Ionicons name="close" size={24} color={colors.icon} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.sendButton}
             onPress={handleSend}
           >
-            <Ionicons name="paper-plane" size={24} color={colors.text} />
+            <Ionicons name="paper-plane" size={24} color={colors.icon} />
           </TouchableOpacity>
         </View>
       )}
 
+      {/* Vault Creation Modal */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -372,7 +561,15 @@ export default function CameraScreen() {
             elevation: 5
           }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Create New Vault</Text>
+              <Text 
+                style={[styles.modalTitle, { 
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  textAlign: 'center'
+                }]}
+                numberOfLines={2}
+              >
+                Create New Vault
+              </Text>
               <TouchableOpacity onPress={() => setShowVaultModal(false)}>
                 <Ionicons name="close" size={24} color={theme === 'dark' ? colors.text : '#1B3B4B'} />
               </TouchableOpacity>
@@ -386,8 +583,8 @@ export default function CameraScreen() {
                   color: theme === 'dark' ? colors.text : '#1B3B4B',
                   borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
                 }]}
-                value={username}
-                onChangeText={setUsername}
+                value={vaultName}
+                onChangeText={setVaultName}
                 placeholder="Enter vault name"
                 placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
               />
@@ -401,29 +598,81 @@ export default function CameraScreen() {
                   color: theme === 'dark' ? colors.text : '#1B3B4B',
                   borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
                 }]}
-                value={amount}
+                value={unlockDate}
                 onChangeText={(text) => {
-                  const regex = /^\d*\.?\d*$/;
-                  if (regex.test(text)) {
-                    setAmount(text);
+                  // Auto-format as user types: YYYY-MM-DD
+                  let formatted = text.replace(/\D/g, ''); // Remove non-digits
+                  if (formatted.length >= 5) {
+                    formatted = formatted.substring(0, 4) + '-' + formatted.substring(4);
+                  }
+                  if (formatted.length >= 8) {
+                    formatted = formatted.substring(0, 7) + '-' + formatted.substring(7, 9);
+                  }
+                  if (formatted.length <= 10) {
+                    setUnlockDate(formatted);
                   }
                 }}
                 placeholder="YYYY-MM-DD"
                 placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
-                keyboardType="decimal-pad"
+                keyboardType="numeric"
+                maxLength={10}
+              />
+              <Text style={[styles.helperText, { color: theme === 'dark' ? colors.text + '60' : '#1B3B4B' + '60' }]}>
+                Minimum date: {getMinDate()}
+              </Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Recipient Wallet Address</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={recipientAddress}
+                onChangeText={setRecipientAddress}
+                placeholder="0x..."
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Content</Text>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Flow Amount</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={flowAmount}
+                onChangeText={(text) => {
+                  const regex = /^\d*\.?\d*$/;
+                  if (regex.test(text)) {
+                    setFlowAmount(text);
+                  }
+                }}
+                placeholder="0.0"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                keyboardType="decimal-pad"
+              />
+              <Text style={[styles.helperText, { color: theme === 'dark' ? colors.text + '60' : '#1B3B4B' + '60' }]}>
+                Amount of FLOW tokens to send
+              </Text>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Message</Text>
               <TextInput
                 style={[styles.input, styles.textArea, { 
                   backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
                   color: theme === 'dark' ? colors.text : '#1B3B4B',
                   borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
                 }]}
-                value={description}
-                onChangeText={setDescription}
+                value={content}
+                onChangeText={setContent}
                 placeholder="Enter your message"
                 placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
                 multiline
@@ -434,16 +683,208 @@ export default function CameraScreen() {
             <TouchableOpacity
               style={[styles.createButton, { 
                 backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
-                marginTop: 16,
-                shadowColor: theme === 'dark' ? 'transparent' : '#2E8B57',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 3
+                opacity: isCreatingVault ? 0.7 : 1
               }]}
               onPress={handleCreateVault}
+              disabled={isCreatingVault}
             >
-              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Create Vault</Text>
+              {isCreatingVault ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={[styles.buttonText, { color: '#FFFFFF', marginLeft: 8 }]}>
+                    Creating Vault...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
+                  Create Vault
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showConfirmationModal}
+        onRequestClose={() => setShowConfirmationModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { 
+            backgroundColor: theme === 'dark' ? colors.background : '#F0FFF0',
+            borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20',
+            shadowColor: theme === 'dark' ? 'transparent' : '#1B3B4B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 5
+          }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                <View style={[styles.checkmarkContainer, { backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57' }]}>
+                  <Ionicons name="checkmark" size={32} color="white" />
+                </View>
+                <Text style={[styles.modalTitle, { color: theme === 'dark' ? colors.text : '#1B3B4B', marginTop: 16 }]}>
+                  Vault Created!
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Vault Name
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {vaultName}
+              </Text>
+
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Unlock Date
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {unlockDate}
+              </Text>
+
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Recipient
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {recipientAddress}
+              </Text>
+
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Flow Amount
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {flowAmount} FLOW
+              </Text>
+
+              <Text style={[styles.modalLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Message
+              </Text>
+              <Text style={[styles.modalValue, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                {content}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createButton, { 
+                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
+                marginTop: 16
+              }]}
+              onPress={() => {
+                setShowConfirmationModal(false);
+                handleCancel(); // Reset form and media
+                router.push('/chat/1');
+              }}
+            >
+              <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Username Registration Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showUsernameModal}
+        onRequestClose={() => setShowUsernameModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { 
+            backgroundColor: theme === 'dark' ? colors.background : '#F0FFF0',
+            borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20',
+            shadowColor: theme === 'dark' ? 'transparent' : '#1B3B4B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 5
+          }]}>
+            <View style={styles.modalHeader}>
+              <Text 
+                style={[styles.modalTitle, { 
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  textAlign: 'center'
+                }]}
+                numberOfLines={2}
+              >
+                Register Username
+              </Text>
+              <TouchableOpacity onPress={() => setShowUsernameModal(false)}>
+                <Ionicons name="close" size={24} color={theme === 'dark' ? colors.text : '#1B3B4B'} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.inputLabel, { 
+              color: theme === 'dark' ? colors.text : '#1B3B4B',
+              marginBottom: 8,
+              textAlign: 'center'
+            }]}>
+              You need to register a username before creating vaults
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <Text style={[styles.inputLabel, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>Username</Text>
+              <TextInput
+                style={[styles.input, { 
+                  backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(46,139,87,0.05)',
+                  color: theme === 'dark' ? colors.text : '#1B3B4B',
+                  borderColor: theme === 'dark' ? colors.icon + '20' : '#2E8B57' + '20'
+                }]}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter username (3-20 characters)"
+                placeholderTextColor={theme === 'dark' ? colors.text + '80' : '#1B3B4B' + '80'}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={20}
+              />
+              <Text style={[styles.helperText, { color: theme === 'dark' ? colors.text + '60' : '#1B3B4B' + '60' }]}>
+                This username will be associated with your wallet address
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createButton, { 
+                backgroundColor: theme === 'dark' ? colors.tint : '#2E8B57',
+                opacity: isRegisteringUsername ? 0.7 : 1
+              }]}
+              onPress={handleRegisterUsername}
+              disabled={isRegisteringUsername}
+            >
+              {isRegisteringUsername ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={[styles.buttonText, { color: '#FFFFFF', marginLeft: 8 }]}>
+                    Registering...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>
+                  Register Username
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.createButton, { 
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderColor: theme === 'dark' ? colors.text + '30' : '#1B3B4B' + '30',
+                marginTop: 8
+              }]}
+              onPress={() => {
+                setShowUsernameModal(false);
+                setShowVaultModal(true);
+              }}
+            >
+              <Text style={[styles.buttonText, { color: theme === 'dark' ? colors.text : '#1B3B4B' }]}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -527,16 +968,36 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    left: 20,
-    padding: 10,
+    left: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 25,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   sendButton: {
     position: 'absolute',
-    right: 20,
+    right: 16,
     bottom: 100,
-    padding: 10,
+    padding: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 25,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   modalContainer: {
     flex: 1,
@@ -550,6 +1011,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -557,9 +1019,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  modalTitleContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  checkmarkContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   inputContainer: {
     marginBottom: 16,
@@ -575,6 +1049,10 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
   },
+  helperText: {
+    fontSize: 12,
+    marginTop: 4,
+  },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
@@ -584,6 +1062,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     minWidth: 200,
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   buttonText: {
@@ -607,6 +1089,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   modeText: {
+    color: 'white',
     fontSize: 16,
   },
   videoControls: {
@@ -633,4 +1116,17 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-}); 
+  modalBody: {
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  modalValue: {
+    fontSize: 16,
+    fontWeight: '400',
+  },
+});
