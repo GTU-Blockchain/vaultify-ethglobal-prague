@@ -36,29 +36,106 @@ class IPFSService {
       console.log('📁 File URI:', fileUri);
       console.log('🔑 Using API key:', this.apiKey.substring(0, 10) + '...');
 
-      // For React Native, use direct file path approach
-      const uploadResponse = await lighthouse.upload([fileUri], this.apiKey);
+      // Validate file extension
+      const fileExtension = fileName.toLowerCase().split('.').pop();
+      const validImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+      const validVideoExtensions = ['mp4', 'mov', 'avi', 'webm'];
+      const allValidExtensions = [...validImageExtensions, ...validVideoExtensions];
+      
+      if (!fileExtension || !allValidExtensions.includes(fileExtension)) {
+        throw new Error(`Desteklenmeyen dosya formatı: ${fileExtension}. Desteklenen formatlar: ${allValidExtensions.join(', ')}`);
+      }
+      
+      console.log('✅ File extension validation passed:', fileExtension);
 
-      console.log('📤 Lighthouse response:', uploadResponse);
+      // Determine MIME type based on extension
+      let mimeType = 'application/octet-stream';
+      if (validImageExtensions.includes(fileExtension)) {
+        mimeType = fileExtension === 'jpg' || fileExtension === 'jpeg' ? 'image/jpeg' : `image/${fileExtension}`;
+      } else if (validVideoExtensions.includes(fileExtension)) {
+        mimeType = fileExtension === 'mov' ? 'video/quicktime' : `video/${fileExtension}`;
+      }
+      
+      console.log('📋 Determined MIME type:', mimeType);
 
-      if (!uploadResponse.data || !uploadResponse.data.Hash) {
+      // Create FormData for proper binary upload
+      const formData = new FormData();
+      
+      // Create file object for React Native
+      const fileObject = {
+        uri: fileUri,
+        type: mimeType,
+        name: fileName,
+      } as any;
+      
+      formData.append('file', fileObject);
+      
+      console.log('📦 FormData created with file:', {
+        name: fileName,
+        type: mimeType,
+        uri: fileUri.substring(0, 50) + '...'
+      });
+
+      // Upload using fetch with FormData (instead of Lighthouse SDK)
+      const uploadResponse = await fetch('https://node.lighthouse.storage/api/v0/add', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: formData,
+      });
+
+      console.log('📤 Upload response status:', uploadResponse.status);
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('❌ Upload failed:', errorText);
+        throw new Error(`HTTP ${uploadResponse.status}: ${errorText}`);
+      }
+
+      const responseData = await uploadResponse.json();
+      console.log('📤 Lighthouse response:', responseData);
+
+      if (!responseData.Hash) {
         throw new Error('Failed to upload media to IPFS - no hash received');
       }
 
       const result: UploadResult = {
-        hash: uploadResponse.data.Hash,
-        size: typeof uploadResponse.data.Size === 'string' ? parseInt(uploadResponse.data.Size) : (uploadResponse.data.Size || 0),
-        url: `https://gateway.lighthouse.storage/ipfs/${uploadResponse.data.Hash}`
+        hash: responseData.Hash,
+        size: responseData.Size || 0,
+        url: `https://gateway.lighthouse.storage/ipfs/${responseData.Hash}`
       };
 
       console.log('✅ Media uploaded successfully:', result);
 
-      // Verify the upload by checking if it's accessible
+      // Verify the upload by checking if it's accessible and has correct content type
       try {
         console.log('🔍 Verifying upload...');
         const verifyResponse = await fetch(result.url, { method: 'HEAD' });
         if (verifyResponse.ok) {
-          console.log('✅ Upload verified - media is accessible');
+          const contentType = verifyResponse.headers.get('content-type');
+          console.log('✅ Upload verified - media is accessible. Content-Type:', contentType);
+          
+          // Check if content type matches file extension
+          const isImage = validImageExtensions.includes(fileExtension || '');
+          const isVideo = validVideoExtensions.includes(fileExtension || '');
+          
+          if (contentType) {
+            const hasCorrectType = (
+              (isImage && (contentType.startsWith('image/') || contentType.includes('jpeg') || contentType.includes('jpg') || contentType.includes('png'))) ||
+              (isVideo && (contentType.startsWith('video/') || contentType.includes('mp4') || contentType.includes('mov')))
+            );
+            
+            if (!hasCorrectType) {
+              console.log('⚠️ Content type mismatch:', {
+                expected: isImage ? 'image/*' : 'video/*',
+                actual: contentType,
+                fileExtension
+              });
+            } else {
+              console.log('✅ Content type verification passed');
+            }
+          }
         } else {
           console.log('⚠️ Upload verification failed but continuing...');
         }
@@ -76,15 +153,17 @@ class IPFSService {
         stack: error.stack
       });
       
-      if (error.message.includes('API key')) {
-        throw new Error('Invalid Lighthouse API key. Please check your API key in environment variables.');
-      } else if (error.message.includes('Network')) {
-        throw new Error('Network error while uploading to IPFS. Please check your internet connection.');
+      if (error.message.includes('API key') || error.message.includes('Authorization')) {
+        throw new Error('Geçersiz Lighthouse API anahtarı. Lütfen environment değişkenlerindeki API anahtarınızı kontrol edin.');
+      } else if (error.message.includes('Network') || error.message.includes('Failed to fetch')) {
+        throw new Error('IPFS yüklemesi sırasında ağ hatası. Lütfen internet bağlantınızı kontrol edin.');
       } else if (error.message.includes('File not found') || error.message.includes('no such file')) {
-        throw new Error('File not found. Please try taking the photo/video again.');
+        throw new Error('Dosya bulunamadı. Lütfen fotoğraf/videoyu tekrar çekmeyi deneyin.');
+      } else if (error.message.includes('Desteklenmeyen dosya formatı')) {
+        throw error; // Re-throw validation errors as-is
       }
       
-      throw new Error(`Failed to upload media: ${error.message}`);
+      throw new Error(`Medya yükleme başarısız: ${error.message}`);
     }
   }
 
@@ -153,12 +232,12 @@ class IPFSService {
       });
       
       if (error.message.includes('API key')) {
-        throw new Error('Invalid Lighthouse API key. Please check your API key.');
+        throw new Error('Geçersiz Lighthouse API anahtarı. Lütfen API anahtarınızı kontrol edin.');
       } else if (error.message.includes('react-native-fs')) {
-        throw new Error('React Native file system not available. Please install react-native-fs.');
+        throw new Error('React Native dosya sistemi mevcut değil. Lütfen react-native-fs yükleyin.');
       }
       
-      throw new Error(`Failed to upload metadata: ${error.message}`);
+      throw new Error(`Metadata yükleme başarısız: ${error.message}`);
     }
   }
 
@@ -181,15 +260,124 @@ class IPFSService {
 
     } catch (error: any) {
       console.error('❌ Error retrieving metadata from IPFS:', error);
-      throw new Error('Failed to retrieve vault data. The content may not be available.');
+      throw new Error('Vault verileri alınamadı. İçerik mevcut olmayabilir.');
     }
   }
 
   /**
-   * Get media URL from IPFS hash
+   * Get media URL from IPFS hash with proper headers for React Native
    */
-  getMediaUrl(ipfsHash: string): string {
-    return `https://gateway.lighthouse.storage/ipfs/${ipfsHash}`;
+  getMediaUrl(ipfsHash: string, mediaType?: 'photo' | 'video'): string {
+    // Use the proper Lighthouse gateway URL
+    const baseUrl = `https://gateway.lighthouse.storage/ipfs/${ipfsHash}`;
+    
+    console.log('🔗 Generating media URL:', {
+      ipfsHash,
+      mediaType,
+      url: baseUrl
+    });
+    
+    return baseUrl;
+  }
+
+  /**
+   * Get multiple gateway URLs for fallback loading
+   */
+  getMediaUrls(ipfsHash: string): string[] {
+    const gateways = [
+      `https://gateway.lighthouse.storage/ipfs/${ipfsHash}`,
+      `https://ipfs.io/ipfs/${ipfsHash}`,
+      `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`,
+      `https://dweb.link/ipfs/${ipfsHash}`,
+      `https://gateway.pinata.cloud/ipfs/${ipfsHash}`
+    ];
+    
+    console.log('🔗 Generated fallback URLs:', gateways);
+    return gateways;
+  }
+
+  /**
+   * Get media URL with headers for fetch-based loading (alternative method)
+   */
+  async getMediaWithHeaders(ipfsHash: string): Promise<{
+    uri: string;
+    headers: Record<string, string>;
+  }> {
+    try {
+      const url = `https://gateway.lighthouse.storage/ipfs/${ipfsHash}`;
+      
+      console.log('🔍 Checking media headers for:', url);
+      
+      // First make a HEAD request to get content type
+      const headResponse = await fetch(url, { method: 'HEAD' });
+      const contentType = headResponse.headers.get('content-type');
+      
+      console.log('📋 Media content type:', contentType);
+      
+      return {
+        uri: url,
+        headers: {
+          'Accept': 'image/*,video/*',
+          'Cache-Control': 'no-cache',
+          'Content-Type': contentType || 'application/octet-stream'
+        }
+      };
+    } catch (error) {
+      console.error('⚠️ Error getting media headers:', error);
+      return {
+        uri: `https://gateway.lighthouse.storage/ipfs/${ipfsHash}`,
+        headers: {
+          'Accept': 'image/*,video/*',
+          'Cache-Control': 'no-cache'
+        }
+      };
+    }
+  }
+
+  /**
+   * Test if media is accessible and get its format info
+   */
+  async testMediaAccess(ipfsHash: string): Promise<{
+    accessible: boolean;
+    contentType?: string;
+    size?: number;
+    error?: string;
+  }> {
+    try {
+      const url = `https://gateway.lighthouse.storage/ipfs/${ipfsHash}`;
+      console.log('🧪 Testing media access:', url);
+      
+      const response = await fetch(url, { method: 'HEAD' });
+      
+      if (response.ok) {
+        const contentType = response.headers.get('content-type');
+        const contentLength = response.headers.get('content-length');
+        
+        console.log('✅ Media accessible:', {
+          contentType,
+          size: contentLength,
+          status: response.status
+        });
+        
+        return {
+          accessible: true,
+          contentType: contentType || undefined,
+          size: contentLength ? parseInt(contentLength) : undefined
+        };
+      } else {
+        console.log('❌ Media not accessible:', response.status, response.statusText);
+        return {
+          accessible: false,
+          error: `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ Error testing media access:', error);
+      return {
+        accessible: false,
+        error: error.message
+      };
+    }
   }
 
   /**
@@ -214,7 +402,14 @@ class IPFSService {
       // Upload media if provided
       if (mediaUri && mediaType) {
         console.log('📸 Uploading media...');
-        const fileName = `vault-media-${Date.now()}.${mediaType === 'photo' ? 'jpg' : 'mp4'}`;
+        
+        // Create proper filename with correct extension
+        const timestamp = Date.now();
+        const extension = mediaType === 'photo' ? 'jpg' : 'mp4';
+        const fileName = `vault-media-${timestamp}.${extension}`;
+        
+        console.log('📁 Generated filename:', fileName);
+        
         const mediaResult = await this.uploadMedia(mediaUri, fileName);
         mediaHash = mediaResult.hash;
         mediaUrl = mediaResult.url;
@@ -227,6 +422,7 @@ class IPFSService {
       const completeMetadata: VaultMetadata = {
         ...metadata,
         mediaType,
+        mediaHash: mediaHash || null,
       };
 
       console.log('📝 Uploading metadata...');
@@ -246,7 +442,7 @@ class IPFSService {
 
     } catch (error: any) {
       console.error('❌ Error uploading vault to IPFS:', error);
-      throw new Error(`Failed to create vault: ${error.message}`);
+      throw new Error(`Vault oluşturma başarısız: ${error.message}`);
     }
   }
 
@@ -255,19 +451,19 @@ class IPFSService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      console.log('🧪 Testing Lighthouse connection...');
+      console.log('🧪 Lighthouse bağlantısı test ediliyor...');
       
       const testData = 'test-connection-' + Date.now();
       const response = await lighthouse.uploadText(testData, this.apiKey, 'test.txt');
       
       if (response.data && response.data.Hash) {
-        console.log('✅ Connection test successful');
+        console.log('✅ Bağlantı testi başarılı');
         return true;
       }
       
       return false;
     } catch (error) {
-      console.error('❌ Connection test failed:', error);
+      console.error('❌ Bağlantı testi başarısız:', error);
       return false;
     }
   }

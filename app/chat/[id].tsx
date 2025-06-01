@@ -110,51 +110,18 @@ export default function VaultListScreen() {
 
   const handleVaultPress = async (vault: Vault) => {
     try {
-      const vaultData = await vaultService.getVault(Number(vault.id));
-      if (!vaultData) {
-        Alert.alert('Error', 'Could not load vault data');
-        return;
-      }
-
-      if (vault.isSent && vaultData.recipientUsername !== name) {
-        return;
-      }
-
-      const canOpen = await vaultService.canOpenVault(Number(vault.id));
+      console.log(`🔍 Opening vault detail for ID: ${vault.id}`);
       
-      if (canOpen) {
-        const metadata = await vaultService.getVaultMetadata(vaultData.ipfsCID);
-        if (!metadata) {
-          Alert.alert('Error', 'Could not load vault metadata');
-          return;
+      // Simply navigate to vault detail page - it will load its own data
+      router.push({
+        pathname: '/vault/[id]',
+        params: {
+          id: vault.id
         }
-
-        router.push({
-          pathname: '/vault/[id]',
-          params: {
-            id: vault.id,
-            content: vaultData.message,
-            mediaUrl: metadata.mediaHash ? vaultService.getMediaUrl(metadata.mediaHash) : undefined,
-            isOpened: vaultData.isOpened.toString()
-          }
-        });
-      } else {
-        const unlockTime = new Date(vaultData.unlockAt * 1000);
-        const now = new Date();
-        const timeLeft = unlockTime.getTime() - now.getTime();
-        
-        if (timeLeft > 0) {
-          const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-          const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-          
-          setCountdown({ days, hours, minutes });
-          setCountdownModalVisible(true);
-        }
-      }
+      });
     } catch (error: any) {
-      console.error('Error handling vault press:', error);
-      Alert.alert('Error', error.message || 'Failed to process vault');
+      console.error('Error navigating to vault detail:', error);
+      Alert.alert('Error', error.message || 'Failed to open vault detail');
     }
   };
 
@@ -264,20 +231,49 @@ export default function VaultListScreen() {
               <Text style={[styles.vaultName, { color: colors.text }]}>{vault.name}</Text>
               <View style={styles.vaultInfo}>
                 <Text style={[styles.vaultDate, { color: colors.icon }]}>{vault.date}</Text>
-                {vault.status === 'pending' && (
-                  <Ionicons name="time" size={18} color={colors.icon} style={styles.statusIcon} />
-                )}
-                {vault.status === 'completed' && (
-                  <Ionicons name="checkmark-done" size={18} color={colors.icon} style={styles.statusIcon} />
-                )}
+                <View style={styles.vaultStatusContainer}>
+                  {vault.isSent ? (
+                    // Sent vaults - always show as sent/accessible
+                    <View style={styles.statusIconContainer}>
+                      <Ionicons name="paper-plane" size={16} color={colors.icon} style={styles.statusIcon} />
+                      <Text style={[styles.statusText, { color: colors.icon }]}>Sent</Text>
+                    </View>
+                  ) : (
+                    // Received vaults - show status based on completion
+                    <View style={styles.statusIconContainer}>
+                      {vault.status === 'pending' && (
+                        <>
+                          <Ionicons name="time" size={16} color={colors.icon} style={styles.statusIcon} />
+                          <Text style={[styles.statusText, { color: colors.icon }]}>Locked</Text>
+                        </>
+                      )}
+                      {vault.status === 'completed' && (
+                        <>
+                          <Ionicons name="checkmark-done" size={16} color={colors.tint} style={styles.statusIcon} />
+                          <Text style={[styles.statusText, { color: colors.tint }]}>Unlocked</Text>
+                        </>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
             <View style={{ opacity: 0.9 }}>
-              <Ionicons 
-                name={vault.status === 'completed' ? "lock-closed" : "time-outline"} 
-                size={28} 
-                color={colors.icon} 
-              />
+              {vault.isSent ? (
+                // Sent vaults - always show as accessible (open lock or check)
+                <Ionicons 
+                  name="lock-open" 
+                  size={28} 
+                  color={colors.tint} 
+                />
+              ) : (
+                // Received vaults - show based on status
+                <Ionicons 
+                  name={vault.status === 'completed' ? "lock-open" : "lock-closed"} 
+                  size={28} 
+                  color={vault.status === 'completed' ? colors.tint : colors.icon} 
+                />
+              )}
             </View>
           </TouchableOpacity>
         ))}
@@ -358,7 +354,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   statusIcon: {
-    marginLeft: 8,
+    marginRight: 4,
   },
   fab: {
     position: 'absolute',
@@ -452,5 +448,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  vaultStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 14,
   },
 });
