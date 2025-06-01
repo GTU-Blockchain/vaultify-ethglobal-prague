@@ -34,7 +34,7 @@ export default function Person({
           key="incoming" 
           name="arrow-down" 
           size={12} 
-          color="#4CAF50" 
+          color="#8AAFDE" 
           style={styles.interactionIcon}
         />
       );
